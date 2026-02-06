@@ -77,7 +77,7 @@ class Screensaver:
         self.particles = [Particle(self.screen_width, self.screen_height) for _ in range(100)]
         
         # Scanline position and timing
-        self.scanline_y = -1000  # Start offscreen
+        self.scanline_x = -self.screen_height  # Start offscreen left
         self.scanline_waiting = True
         self.next_scanline_time = 15.0  # Wait 15 seconds before first scanline
         
@@ -94,22 +94,23 @@ class Screensaver:
         for particle in self.particles:
             particle.update(dt)
         
-        # Update scanline - only appears every 15 seconds
+        # Update scanline - diagonal movement, only appears every 15 seconds
         if self.scanline_waiting:
             # Waiting for next scanline
             self.next_scanline_time -= dt
             if self.next_scanline_time <= 0:
-                # Start new scanline
+                # Start new scanline from left
                 self.scanline_waiting = False
-                self.scanline_y = 0
+                self.scanline_x = -self.screen_height
         else:
-            # Scanline is moving
-            self.scanline_y += 150 * dt
-            if self.scanline_y > self.screen_height + 50:
+            # Scanline is moving left to right
+            self.scanline_x += 150 * dt
+            # Stop when completely off screen on the right
+            if self.scanline_x > self.screen_width + self.screen_height:
                 # Scanline finished, wait 15 seconds before next one
                 self.scanline_waiting = True
                 self.next_scanline_time = 15.0
-                self.scanline_y = -1000  # Move offscreen
+                self.scanline_x = -self.screen_height
         
     def draw(self):
         """Draw static image with animated overlay effects"""
@@ -125,11 +126,11 @@ class Screensaver:
         # Effect 2: Color wave overlay
         self._draw_color_wave()
         
-        # Effect 3: Scanline sweep
-        self._draw_scanline()
-        
-        # Effect 4: Pulsing corner glow
+        # Effect 3: Pulsing corner glow
         self._draw_corner_glow()
+        
+        # Effect 4: Scanline sweep (drawn last so it's on top)
+        self._draw_scanline()
     
     def _draw_particles(self):
         """Draw floating particles"""
@@ -177,16 +178,35 @@ class Screensaver:
         self.screen.blit(wave_surf, (0, 0))
     
     def _draw_scanline(self):
-        """Draw moving scanline effect"""
+        """Draw moving diagonal scanline effect with grainy texture"""
+        # Only draw if scanline is visible
+        if self.scanline_waiting:
+            return
+    def _draw_scanline(self):
+        """Draw moving diagonal scanline effect - subtle like original but diagonal"""
+        # Only draw if scanline is visible
+        if self.scanline_waiting:
+            return
+        
         scanline_surf = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
         
-        # Main scanline - subtiel
+        offset = int(self.scanline_x)
+        
+        # Single diagonal line with subtle trail (like original horizontal scanline)
         for i in range(50):
             alpha = int(40 * (1 - i / 50.0))
-            y = int(self.scanline_y - i)
-            if 0 <= y < self.screen_height:
-                pygame.draw.line(scanline_surf, (100, 200, 255, alpha), 
-                               (0, y), (self.screen_width, y), 1)
+            
+            # Diagonal line position - each line slightly behind the main one
+            x_offset = offset - i
+            
+            # Draw diagonal line from top to bottom
+            start_x = x_offset - self.screen_height
+            start_y = 0
+            end_x = x_offset + self.screen_height
+            end_y = self.screen_height
+            
+            pygame.draw.line(scanline_surf, (100, 200, 255, alpha), 
+                           (start_x, start_y), (end_x, end_y), 1)
         
         self.screen.blit(scanline_surf, (0, 0))
     
@@ -205,3 +225,5 @@ class Screensaver:
                 alpha = int((1 - radius / corner_size) * intensity)
                 pygame.draw.circle(glow_surf, (80, 120, 200, alpha), 
                                  (corner_x, corner_y), radius)
+        
+        self.screen.blit(glow_surf, (0, 0))
