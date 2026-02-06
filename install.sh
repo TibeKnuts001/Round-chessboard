@@ -12,6 +12,8 @@ echo ""
 # Maak alle scripts executable
 echo "1. Making scripts executable..."
 chmod +x run.sh
+chmod +x chess.sh
+chmod +x checkers.sh
 chmod +x install/install_venv.sh
 chmod +x install/install_splash.sh
 chmod +x install/install_autostart.sh

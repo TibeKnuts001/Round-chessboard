@@ -1,10 +1,10 @@
 #!/bin/bash
-# Installeer application launcher en desktop icon voor Chess spel
+# Installeer application launchers en desktop icons voor Chess en Checkers
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "Chess Project - Launcher & Desktop Icon Setup"
-echo "=============================================="
+echo "Chess & Checkers - Launcher & Desktop Icon Setup"
+echo "=================================================="
 echo ""
 
 # Maak applications directory als die niet bestaat
@@ -29,40 +29,79 @@ else
     ICON_PATH="/usr/share/pixmaps/debian-logo.png"
 fi
 
-# Maak application launcher in .local/share/applications
-LAUNCHER_FILE="$APPS_DIR/Roundchess.desktop"
+# ========================================
+# CHESS LAUNCHER
+# ========================================
+CHESS_LAUNCHER_FILE="$APPS_DIR/Chess.desktop"
 
 echo ""
-echo "Creating application launcher..."
-cat > "$LAUNCHER_FILE" << EOF
+echo "Creating Chess application launcher..."
+cat > "$CHESS_LAUNCHER_FILE" << EOF
 [Desktop Entry]
-Name=Round chessboard
-Comment=Round chessboard game
-Exec=$SCRIPT_DIR/run.sh
+Name=Chess
+Comment=Play Chess on round chessboard
+Exec=$SCRIPT_DIR/chess.sh
 Icon=$ICON_PATH
 Terminal=false
 Type=Application
 Categories=Game;
 EOF
 
-chmod +x "$LAUNCHER_FILE"
-echo "   ✓ Launcher created: $LAUNCHER_FILE"
+chmod +x "$CHESS_LAUNCHER_FILE"
+echo "   ✓ Chess launcher created: $CHESS_LAUNCHER_FILE"
 
-# Maak desktop icon (link naar launcher)
-DESKTOP_ICON="$DESKTOP_DIR/Roundchess.desktop"
+# Maak chess desktop icon
+CHESS_DESKTOP_ICON="$DESKTOP_DIR/Chess.desktop"
 
 echo ""
-echo "Creating desktop icon..."
-cat > "$DESKTOP_ICON" << EOF
+echo "Creating Chess desktop icon..."
+cat > "$CHESS_DESKTOP_ICON" << EOF
 [Desktop Entry]
 Type=Link
-Name=Round chessboard
+Name=Chess
 Icon=$ICON_PATH
-URL=$LAUNCHER_FILE
+URL=$CHESS_LAUNCHER_FILE
 EOF
 
-chmod +x "$DESKTOP_ICON"
-echo "   ✓ Desktop icon created: $DESKTOP_ICON"
+chmod +x "$CHESS_DESKTOP_ICON"
+echo "   ✓ Chess desktop icon created: $CHESS_DESKTOP_ICON"
+
+# ========================================
+# CHECKERS LAUNCHER
+# ========================================
+CHECKERS_LAUNCHER_FILE="$APPS_DIR/Checkers.desktop"
+
+echo ""
+echo "Creating Checkers application launcher..."
+cat > "$CHECKERS_LAUNCHER_FILE" << EOF
+[Desktop Entry]
+Name=Checkers
+Comment=Play Checkers on round chessboard
+Exec=$SCRIPT_DIR/checkers.sh
+Icon=$ICON_PATH
+Terminal=false
+Type=Application
+Categories=Game;
+EOF
+
+chmod +x "$CHECKERS_LAUNCHER_FILE"
+echo "   ✓ Checkers launcher created: $CHECKERS_LAUNCHER_FILE"
+
+# Maak checkers desktop icon
+CHECKERS_DESKTOP_ICON="$DESKTOP_DIR/Checkers.desktop"
+
+echo ""
+echo "Creating Checkers desktop icon..."
+cat > "$CHECKERS_DESKTOP_ICON" << EOF
+[Desktop Entry]
+Type=Link
+Name=Checkers
+Icon=$ICON_PATH
+URL=$CHECKERS_LAUNCHER_FILE
+EOF
+
+chmod +x "$CHECKERS_DESKTOP_ICON"
+echo "   ✓ Checkers desktop icon created: $CHECKERS_DESKTOP_ICON"
 
 # Configureer libfm voor quick_exec (zodat .desktop files direct starten)
 LIBFM_CONF="$HOME/.config/libfm/libfm.conf"
@@ -132,12 +171,18 @@ else
 fi
 
 echo ""
-echo "=============================================="
+echo "=================================================="
 echo "✅ Launcher & Desktop icon setup compleet!"
-echo "=============================================="
+echo "=================================================="
 echo ""
-echo "Je kunt het chess spel nu starten via:"
-echo "  - Application menu (Games -> Round chessboard)"
-echo "  - Desktop icon (Round chessboard)"
-echo "  - Command line: ./run.sh"
+echo "Je kunt de games nu starten via:"
+echo "  - Application menu (Games):"
+echo "      • Chess"
+echo "      • Checkers"
+echo "  - Desktop icons:"
+echo "      • Chess"
+echo "      • Checkers"
+echo "  - Command line:"
+echo "      • ./chess.sh     - Start chess"
+echo "      • ./checkers.sh  - Start checkers"
 echo ""

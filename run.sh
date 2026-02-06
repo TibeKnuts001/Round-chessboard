@@ -21,18 +21,39 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
-# Check of een script is opgegeven, anders start chessgame
+# Check of game parameter is opgegeven
 if [ -z "$1" ]; then
-    SCRIPT="chessgame.py"
-    echo "Starting chess game..."
-else
-    SCRIPT="$1"
-    # Check of bestand bestaat
-    if [ ! -f "$SCRIPT" ]; then
-        echo "❌ Bestand niet gevonden: $SCRIPT"
+    echo "❌ Game parameter required!"
+    echo "Usage: $0 <game>"
+    echo "  where <game> is: chess, checkers"
+    echo ""
+    echo "Or use:"
+    echo "  ./chess.sh    - Start chess game"
+    echo "  ./checkers.sh - Start checkers game"
+    exit 1
+fi
+
+# Bepaal script op basis van game parameter
+case "$1" in
+    chess)
+        SCRIPT="chessgame.py"
+        echo "Starting chess game..."
+        ;;
+    checkers)
+        SCRIPT="checkersgame.py"
+        echo "Starting checkers game..."
+        ;;
+    *)
+        echo "❌ Unknown game: $1"
+        echo "Valid options: chess, checkers"
         exit 1
-    fi
-    echo "Running $SCRIPT in venv..."
+        ;;
+esac
+
+# Check of script bestaat
+if [ ! -f "$SCRIPT" ]; then
+    echo "❌ Game script not found: $SCRIPT"
+    exit 1
 fi
 
 echo ""
