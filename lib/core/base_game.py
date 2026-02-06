@@ -651,7 +651,9 @@ class BaseGame(ABC):
                         
                         # Haal capture info op van GUI voor correcte kleuren
                         capture_squares = getattr(self.gui, 'capture_squares', [])
-                        normal_squares = getattr(self.gui, 'highlighted_squares', destinations)
+                        # highlighted_squares kan dict zijn (checkers) of list (chess)
+                        hs = getattr(self.gui, 'highlighted_squares', destinations)
+                        normal_squares = hs.get('destinations', []) if isinstance(hs, dict) else hs
                         
                         # Groen voor normale moves
                         for pos in normal_squares:
@@ -677,7 +679,9 @@ class BaseGame(ABC):
                     
                     # Haal capture info op van GUI voor correcte kleuren
                     capture_squares = getattr(self.gui, 'capture_squares', [])
-                    normal_squares = getattr(self.gui, 'highlighted_squares', destinations)
+                    # highlighted_squares kan dict zijn (checkers) of list (chess)
+                    hs = getattr(self.gui, 'highlighted_squares', destinations)
+                    normal_squares = hs.get('destinations', []) if isinstance(hs, dict) else hs
                     
                     # Groen voor normale moves
                     for pos in normal_squares:

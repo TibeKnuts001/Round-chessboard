@@ -15,18 +15,33 @@ mkdir -p "$APPS_DIR"
 DESKTOP_DIR="$HOME/Desktop"
 mkdir -p "$DESKTOP_DIR"
 
-# Kopieer en installeer app icon
-ICON_SOURCE="$SCRIPT_DIR/assets/appicon/appicon.png"
-ICON_DEST="/usr/share/pixmaps/roundchess.png"
+# Kopieer en installeer app icons
+CHESS_ICON_SOURCE="$SCRIPT_DIR/assets/appicon/chess.png"
+CHESS_ICON_DEST="/usr/share/pixmaps/chess.png"
 
-if [ -f "$ICON_SOURCE" ]; then
-    echo "Installing app icon..."
-    sudo cp "$ICON_SOURCE" "$ICON_DEST"
-    ICON_PATH="$ICON_DEST"
-    echo "   ✓ Icon installed: $ICON_DEST"
+CHECKERS_ICON_SOURCE="$SCRIPT_DIR/assets/appicon/checkers.png"
+CHECKERS_ICON_DEST="/usr/share/pixmaps/roundcheckers.png"
+
+echo "Installing app icons..."
+
+# Chess icon
+if [ -f "$CHESS_ICON_SOURCE" ]; then
+    sudo cp "$CHESS_ICON_SOURCE" "$CHESS_ICON_DEST"
+    CHESS_ICON_PATH="$CHESS_ICON_DEST"
+    echo "   ✓ Chess icon installed: $CHESS_ICON_DEST"
 else
-    echo "Warning: App icon not found, using default Debian logo"
-    ICON_PATH="/usr/share/pixmaps/debian-logo.png"
+    echo "   Warning: Chess icon not found, using default Debian logo"
+    CHESS_ICON_PATH="/usr/share/pixmaps/debian-logo.png"
+fi
+
+# Checkers icon
+if [ -f "$CHECKERS_ICON_SOURCE" ]; then
+    sudo cp "$CHECKERS_ICON_SOURCE" "$CHECKERS_ICON_DEST"
+    CHECKERS_ICON_PATH="$CHECKERS_ICON_DEST"
+    echo "   ✓ Checkers icon installed: $CHECKERS_ICON_DEST"
+else
+    echo "   Warning: Checkers icon not found, using default Debian logo"
+    CHECKERS_ICON_PATH="/usr/share/pixmaps/debian-logo.png"
 fi
 
 # ========================================
@@ -41,7 +56,7 @@ cat > "$CHESS_LAUNCHER_FILE" << EOF
 Name=Chess
 Comment=Play Chess on round chessboard
 Exec=$SCRIPT_DIR/chess.sh
-Icon=$ICON_PATH
+Icon=$CHESS_ICON_PATH
 Terminal=false
 Type=Application
 Categories=Game;
@@ -59,7 +74,7 @@ cat > "$CHESS_DESKTOP_ICON" << EOF
 [Desktop Entry]
 Type=Link
 Name=Chess
-Icon=$ICON_PATH
+Icon=$CHESS_ICON_PATH
 URL=$CHESS_LAUNCHER_FILE
 EOF
 
@@ -78,7 +93,7 @@ cat > "$CHECKERS_LAUNCHER_FILE" << EOF
 Name=Checkers
 Comment=Play Checkers on round chessboard
 Exec=$SCRIPT_DIR/checkers.sh
-Icon=$ICON_PATH
+Icon=$CHECKERS_ICON_PATH
 Terminal=false
 Type=Application
 Categories=Game;
@@ -96,7 +111,7 @@ cat > "$CHECKERS_DESKTOP_ICON" << EOF
 [Desktop Entry]
 Type=Link
 Name=Checkers
-Icon=$ICON_PATH
+Icon=$CHECKERS_ICON_PATH
 URL=$CHECKERS_LAUNCHER_FILE
 EOF
 
