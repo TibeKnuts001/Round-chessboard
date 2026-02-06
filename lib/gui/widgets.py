@@ -288,13 +288,19 @@ class UIWidgets:
         
         Args:
             screen: Pygame surface
-            message: Bericht tekst
+            message: Bericht tekst (string of list van strings voor meerdere regels)
             board_width: Breedte van het bord (voor centreren)
             board_height: Hoogte van het bord (voor centreren)
             notification_type: 'warning', 'error', 'info', 'success'
         """
+        # Support multi-line messages
+        if isinstance(message, str):
+            lines = [message]
+        else:
+            lines = message
+        
         overlay_width = 400
-        overlay_height = 100
+        overlay_height = 100 + (len(lines) - 1) * 30  # Extra hoogte voor extra regels
         # Centreer in het midden van het 800x800 speelveld (links op scherm)
         overlay_x = (board_width - overlay_width) // 2  # Horizontaal gecentreerd in bord
         overlay_y = (board_height - overlay_height) // 2  # Verticaal gecentreerd in bord
@@ -342,8 +348,17 @@ class UIWidgets:
         icon_rect = icon.get_rect(center=(overlay_x + 40, overlay_y + overlay_height // 2))
         screen.blit(icon, icon_rect)
         
-        # Message tekst
+        # Message tekst (multi-line support)
         font = pygame.font.Font(None, 28)
-        text = font.render(message, True, UIWidgets.COLOR_WHITE)
-        text_rect = text.get_rect(center=(overlay_x + overlay_width // 2 + 20, overlay_y + overlay_height // 2))
-        screen.blit(text, text_rect)
+        font_small = pygame.font.Font(None, 22)
+        
+        # Teken elke regel
+        total_text_height = len(lines) * 30
+        start_y = overlay_y + (overlay_height - total_text_height) // 2
+        
+        for i, line in enumerate(lines):
+            # Eerste regel iets groter, rest kleiner
+            current_font = font if i == 0 else font_small
+            text = current_font.render(line, True, UIWidgets.COLOR_WHITE)
+            text_rect = text.get_rect(center=(overlay_x + overlay_width // 2 + 20, start_y + i * 30 + 15))
+            screen.blit(text, text_rect)

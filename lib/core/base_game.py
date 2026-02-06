@@ -1026,20 +1026,13 @@ class BaseGame(ABC):
         self._show_current_setup_step()
     
     def _get_setup_steps(self):
-        """Get ordered list of piece setup steps (game-specific, can be overridden)
+        """Get ordered list of piece setup steps (must be overridden by subclass)
         
         Returns:
             List of dicts: [{'name': str, 'squares': [str], 'color': tuple}, ...]
         """
-        # Chess setup - wit en zwart gelijktijdig per piece type
-        return [
-            {'name': 'Rooks', 'squares': ['A1', 'H1', 'A8', 'H8'], 'color': (255, 255, 255, 0)},
-            {'name': 'Knights', 'squares': ['B1', 'G1', 'B8', 'G8'], 'color': (255, 255, 255, 0)},
-            {'name': 'Bishops', 'squares': ['C1', 'F1', 'C8', 'F8'], 'color': (255, 255, 255, 0)},
-            {'name': 'Queens', 'squares': ['D1', 'D8'], 'color': (255, 255, 255, 0)},
-            {'name': 'Kings', 'squares': ['E1', 'E8'], 'color': (255, 255, 255, 0)},
-            {'name': 'Pawns', 'squares': ['A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2', 'A7', 'B7', 'C7', 'D7', 'E7', 'F7', 'G7', 'H7'], 'color': (255, 255, 255, 0)},
-        ]
+        # Default: geen setup (moet door subclass worden geïmplementeerd)
+        return []
     
     def _show_current_setup_step(self):
         """Show current step in assisted setup"""
@@ -1053,20 +1046,38 @@ class BaseGame(ABC):
         current_step = steps[self.gui.assisted_setup_step]
         print(f"Setup step {self.gui.assisted_setup_step + 1}/{len(steps)}: Place {current_step['name']}")
         
-        self.show_temp_message(f"Place {current_step['name']}", duration=99999)
+        # Update message met 2 regels
+        message = [
+            f"Place {current_step['name']}",
+            "White on white LEDs, black on orange LEDs"
+        ]
+        self.show_temp_message(message, duration=99999)
         
         # Light up LEDs voor pieces die nog niet geplaatst zijn
         self.leds.clear()
-        for square in current_step['squares']:
+        
+        # White pieces
+        for square in current_step.get('squares', []):
             if square not in self.assisted_setup_placed_squares:
                 sensor_num = ChessMapper.chess_to_sensor(square)
                 if sensor_num is not None:
                     r, g, b, w = current_step['color']
                     self.leds.set_led(sensor_num, r, g, b, w)
+        
+        # Black pieces (als aanwezig)
+        if 'squares_black' in current_step:
+            for square in current_step['squares_black']:
+                if square not in self.assisted_setup_placed_squares:
+                    sensor_num = ChessMapper.chess_to_sensor(square)
+                    if sensor_num is not None:
+                        r, g, b, w = current_step['color_black']
+                        self.leds.set_led(sensor_num, r, g, b, w)
+        
         self.leds.show()
         
-        # Update GUI to highlight squares (alleen niet-geplaatste)
-        remaining_squares = [sq for sq in current_step['squares'] if sq not in self.assisted_setup_placed_squares]
+        # Update GUI to highlight squares (alleen niet-geplaatste) - combineer wit en zwart
+        all_squares = current_step.get('squares', []) + current_step.get('squares_black', [])
+        remaining_squares = [sq for sq in all_squares if sq not in self.assisted_setup_placed_squares]
         self.gui.highlighted_squares = remaining_squares
         self.gui.capture_squares = []  # No captures during setup
     
@@ -1082,11 +1093,18 @@ class BaseGame(ABC):
         current_step = steps[self.gui.assisted_setup_step]
         current_sensors = self.read_sensors()
         
+        # Combineer witte en zwarte squares
+        all_squares_with_colors = []
+        for square in current_step.get('squares', []):
+            all_squares_with_colors.append((square, current_step['color']))
+        for square in current_step.get('squares_black', []):
+            all_squares_with_colors.append((square, current_step['color_black']))
+        
         # Check welke pieces zijn toegevoegd of verwijderd
         pieces_added = False
         pieces_removed = False
         
-        for square in current_step['squares']:
+        for square, color in all_squares_with_colors:
             is_detected = current_sensors.get(square, False)
             was_placed = square in self.assisted_setup_placed_squares
             
@@ -1106,10 +1124,10 @@ class BaseGame(ABC):
                 self.assisted_setup_placed_squares.remove(square)
                 print(f"  Piece removed from {square}")
                 
-                # Turn LED terug AAN voor dit square
+                # Turn LED terug AAN voor dit square (met juiste kleur)
                 sensor_num = ChessMapper.chess_to_sensor(square)
                 if sensor_num is not None:
-                    r, g, b, w = current_step['color']
+                    r, g, b, w = color
                     self.leds.set_led(sensor_num, r, g, b, w)
                 pieces_removed = True
         
@@ -1117,16 +1135,22 @@ class BaseGame(ABC):
         if pieces_added or pieces_removed:
             self.leds.show()
             
-            # Update highlighted squares
-            remaining_squares = [sq for sq in current_step['squares'] if sq not in self.assisted_setup_placed_squares]
+            # Update highlighted squares (combineer witte en zwarte squares)
+            all_step_squares = current_step.get('squares', []) + current_step.get('squares_black', [])
+            remaining_squares = [sq for sq in all_step_squares if sq not in self.assisted_setup_placed_squares]
             self.gui.highlighted_squares = remaining_squares
             
-            # Update message
-            self.show_temp_message(f"Place {current_step['name']}", duration=99999)
+            # Update message met 2 regels
+            message = [
+                f"Place {current_step['name']}",
+                "White on white LEDs, black on orange LEDs"
+            ]
+            self.show_temp_message(message, duration=99999)
         
         # Check of ALLE pieces van deze stap geplaatst zijn - alleen bij toevoegingen checken
         if pieces_added:
-            all_placed = all(sq in self.assisted_setup_placed_squares for sq in current_step['squares'])
+            all_step_squares = current_step.get('squares', []) + current_step.get('squares_black', [])
+            all_placed = all(sq in self.assisted_setup_placed_squares for sq in all_step_squares)
             if all_placed:
                 print(f"  All pieces for step {self.gui.assisted_setup_step + 1} detected!")
                 self._advance_setup_step()

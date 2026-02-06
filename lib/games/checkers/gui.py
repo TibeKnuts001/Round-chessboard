@@ -329,7 +329,9 @@ class CheckersGUI:
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm):
                 # Kies notification type op basis van message content
-                if 'mismatch' in temp_message.lower() or 'invalid' in temp_message.lower():
+                # Als message een list is, check de eerste regel
+                check_text = temp_message[0] if isinstance(temp_message, list) else temp_message
+                if 'mismatch' in check_text.lower() or 'invalid' in check_text.lower():
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='error')
                 else:
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='warning')

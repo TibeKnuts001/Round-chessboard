@@ -48,6 +48,12 @@ class BaseSidebarRenderer:
         """Teken sidebar achtergrond"""
         sidebar_rect = pygame.Rect(self.board_size, 0, self.sidebar_width, self.screen_height)
         pygame.draw.rect(self.screen, self.COLOR_SIDEBAR, sidebar_rect)
+        
+        # Teken verticale scheidingslijn tussen bord en sidebar
+        pygame.draw.line(self.screen, (0, 0, 0), 
+                        (self.board_size, 0), 
+                        (self.board_size, self.screen_height), 
+                        4)
     
     def draw_title(self, title_text):
         """

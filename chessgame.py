@@ -32,6 +32,17 @@ class ChessGame(BaseGame):
         """Check of strict touch-move aan staat voor chess"""
         return self.gui.settings.get('strict_touch_move', False, section='chess')
     
+    def _get_setup_steps(self):
+        """Chess-specifieke setup steps - wit en zwart gelijktijdig per piece type"""
+        return [
+            {'name': 'Rooks', 'squares': ['A1', 'H1'], 'color': (255, 255, 255, 0), 'squares_black': ['A8', 'H8'], 'color_black': (200, 100, 0, 0)},
+            {'name': 'Knights', 'squares': ['B1', 'G1'], 'color': (255, 255, 255, 0), 'squares_black': ['B8', 'G8'], 'color_black': (200, 100, 0, 0)},
+            {'name': 'Bishops', 'squares': ['C1', 'F1'], 'color': (255, 255, 255, 0), 'squares_black': ['C8', 'F8'], 'color_black': (200, 100, 0, 0)},
+            {'name': 'Queens', 'squares': ['D1'], 'color': (255, 255, 255, 0), 'squares_black': ['D8'], 'color_black': (200, 100, 0, 0)},
+            {'name': 'Kings', 'squares': ['E1'], 'color': (255, 255, 255, 0), 'squares_black': ['E8'], 'color_black': (200, 100, 0, 0)},
+            {'name': 'Pawns', 'squares': ['A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2'], 'color': (255, 255, 255, 0), 'squares_black': ['A7', 'B7', 'C7', 'D7', 'E7', 'F7', 'G7', 'H7'], 'color_black': (200, 100, 0, 0)},
+        ]
+    
     def _create_ai(self):
         """Maak Stockfish AI als VS Computer enabled is"""
         skill = self.gui.settings.get('stockfish_skill_level', 10)

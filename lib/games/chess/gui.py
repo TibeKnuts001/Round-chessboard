@@ -389,13 +389,15 @@ class ChessGUI:
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             # Niet tonen als er een dialog open is
             if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm):
-                # Parse message: kan string of tuple (message, type) zijn
+                # Parse message: kan string, list of tuple (message, type) zijn
                 if isinstance(temp_message, tuple):
                     message_text, notification_type = temp_message
                 else:
                     message_text = temp_message
                     # Kies notification type op basis van message content
-                    if 'mismatch' in message_text.lower() or 'invalid' in message_text.lower():
+                    # Als message een list is, check de eerste regel
+                    check_text = message_text[0] if isinstance(message_text, list) else message_text
+                    if 'mismatch' in check_text.lower() or 'invalid' in check_text.lower():
                         notification_type = 'error'
                     else:
                         notification_type = 'warning'

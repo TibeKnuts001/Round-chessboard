@@ -38,6 +38,19 @@ class CheckersGame(BaseGame):
         """Check of strict touch-move aan staat voor checkers"""
         return self.gui.settings.get('strict_touch_move', False, section='checkers')
     
+    def _get_setup_steps(self):
+        """Checkers-specifieke setup steps - wit en zwart gelijktijdig"""
+        # Checkers: 12 white pieces (rij 1-3) + 12 black pieces (rij 6-8) op dark squares
+        return [
+            {
+                'name': 'All pieces', 
+                'squares': ['B1', 'D1', 'F1', 'H1', 'A2', 'C2', 'E2', 'G2', 'B3', 'D3', 'F3', 'H3'],  # White
+                'color': (255, 255, 255, 0),
+                'squares_black': ['A6', 'C6', 'E6', 'G6', 'B7', 'D7', 'F7', 'H7', 'A8', 'C8', 'E8', 'G8'],  # Black
+                'color_black': (200, 100, 0, 0)
+            },
+        ]
+    
     def _create_ai(self):
         """Maak AI als VS Computer enabled is"""
         # Check of we in checkers sectie zitten (niet chess)
