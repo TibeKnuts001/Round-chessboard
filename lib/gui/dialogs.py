@@ -126,16 +126,16 @@ class DialogRenderer:
     
     def draw_new_game_confirm_dialog(self):
         """
-        Teken new game confirmation dialog
+        Teken new game confirmation dialog met 3 opties
         
         Returns:
-            Tuple: (yes_button, no_button)
+            Tuple: (normal_button, assisted_button, cancel_button)
         """
         self._draw_overlay()
         
-        # Dialog box
-        dialog_width = 400
-        dialog_height = 200
+        # Dialog box (compacter voor 3 knoppen)
+        dialog_width = 500
+        dialog_height = 180
         dialog_x = (self.screen_width - dialog_width) // 2
         dialog_y = (self.screen_height - dialog_height) // 2
         
@@ -144,15 +144,97 @@ class DialogRenderer:
         
         # Title
         title = self.font.render("New Game?", True, self.COLOR_BLACK)
-        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 50))
+        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 35))
         self.screen.blit(title, title_rect)
         
         # Message
-        message = self.font_small.render("Start a new game and reset the board?", True, (100, 100, 100))
-        message_rect = message.get_rect(center=(self.screen_width // 2, dialog_y + 90))
+        message = self.font_small.render("Choose setup method:", True, (100, 100, 100))
+        message_rect = message.get_rect(center=(self.screen_width // 2, dialog_y + 65))
         self.screen.blit(message, message_rect)
         
-        # Yes button (green)
+        # Normal button (groen)
+        normal_button = pygame.Rect(
+            self.screen_width // 2 - 220,
+            dialog_y + dialog_height - 65,
+            130,
+            50
+        )
+        
+        # Assisted button (blauw)
+        assisted_button = pygame.Rect(
+            self.screen_width // 2 - 65,
+            dialog_y + dialog_height - 65,
+            130,
+            50
+        )
+        
+        # Cancel button (grijs)
+        cancel_button = pygame.Rect(
+            self.screen_width // 2 + 90,
+            dialog_y + dialog_height - 65,
+            130,
+            50
+        )
+        
+        mouse_pos = pygame.mouse.get_pos()
+        
+        # Normal button (groen)
+        normal_color = (60, 180, 60) if normal_button.collidepoint(mouse_pos) else (50, 150, 50)
+        pygame.draw.rect(self.screen, normal_color, normal_button, border_radius=10)
+        normal_text = self.font_small.render("Normal", True, self.COLOR_WHITE)
+        normal_text_rect = normal_text.get_rect(center=normal_button.center)
+        self.screen.blit(normal_text, normal_text_rect)
+        
+        # Assisted button (blauw)
+        assisted_color = (100, 149, 237) if assisted_button.collidepoint(mouse_pos) else (70, 130, 180)
+        pygame.draw.rect(self.screen, assisted_color, assisted_button, border_radius=10)
+        assisted_text = self.font_small.render("Assisted", True, self.COLOR_WHITE)
+        assisted_text_rect = assisted_text.get_rect(center=assisted_button.center)
+        self.screen.blit(assisted_text, assisted_text_rect)
+        
+        # Cancel button (grijs)
+        cancel_color = (140, 140, 140) if cancel_button.collidepoint(mouse_pos) else (100, 100, 100)
+        pygame.draw.rect(self.screen, cancel_color, cancel_button, border_radius=10)
+        cancel_text = self.font_small.render("Cancel", True, self.COLOR_WHITE)
+        cancel_text_rect = cancel_text.get_rect(center=cancel_button.center)
+        self.screen.blit(cancel_text, cancel_text_rect)
+        
+        return normal_button, assisted_button, cancel_button
+    
+    def draw_skip_setup_step_dialog(self):
+        """
+        Teken skip setup step confirmation dialog
+        
+        Returns:
+            Tuple: (yes_button, no_button)
+        """
+        self._draw_overlay()
+        
+        # Dialog box
+        dialog_width = 450
+        dialog_height = 220
+        dialog_x = (self.screen_width - dialog_width) // 2
+        dialog_y = (self.screen_height - dialog_height) // 2
+        
+        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height)
+        pygame.draw.rect(self.screen, self.COLOR_WHITE, dialog_rect, border_radius=15)
+        
+        # Title
+        title = self.font.render("Skip This Step?", True, self.COLOR_BLACK)
+        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 45))
+        self.screen.blit(title, title_rect)
+        
+        # Message line 1
+        message1 = self.font_small.render("Not all pieces have been detected.", True, (100, 100, 100))
+        message1_rect = message1.get_rect(center=(self.screen_width // 2, dialog_y + 85))
+        self.screen.blit(message1, message1_rect)
+        
+        # Message line 2
+        message2 = self.font_small.render("Continue to next step anyway?", True, (100, 100, 100))
+        message2_rect = message2.get_rect(center=(self.screen_width // 2, dialog_y + 110))
+        self.screen.blit(message2, message2_rect)
+        
+        # Yes button (orange/warning)
         yes_button = pygame.Rect(
             self.screen_width // 2 - 160,
             dialog_y + dialog_height - 70,
@@ -160,7 +242,7 @@ class DialogRenderer:
             50
         )
         
-        # No button (blue)
+        # No button (blue to cancel)
         no_button = pygame.Rect(
             self.screen_width // 2 + 30,
             dialog_y + dialog_height - 70,
@@ -170,17 +252,17 @@ class DialogRenderer:
         
         mouse_pos = pygame.mouse.get_pos()
         
-        # Yes button
-        yes_color = (60, 180, 60) if yes_button.collidepoint(mouse_pos) else (50, 150, 50)
+        # Yes button (orange/warning)
+        yes_color = (240, 150, 60) if yes_button.collidepoint(mouse_pos) else (220, 130, 40)
         pygame.draw.rect(self.screen, yes_color, yes_button, border_radius=10)
-        yes_text = self.font.render("Yes", True, self.COLOR_WHITE)
+        yes_text = self.font.render("Skip", True, self.COLOR_WHITE)
         yes_text_rect = yes_text.get_rect(center=yes_button.center)
         self.screen.blit(yes_text, yes_text_rect)
         
         # No button
         no_color = self.COLOR_BUTTON_HOVER if no_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
         pygame.draw.rect(self.screen, no_color, no_button, border_radius=10)
-        no_text = self.font.render("No", True, self.COLOR_WHITE)
+        no_text = self.font.render("Wait", True, self.COLOR_WHITE)
         no_text_rect = no_text.get_rect(center=no_button.center)
         self.screen.blit(no_text, no_text_rect)
         

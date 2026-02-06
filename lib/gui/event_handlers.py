@@ -478,15 +478,25 @@ class EventHandlers:
             return True
         return False
     
-    def handle_new_game_yes_click(self, pos, yes_button):
-        """Handle klik op Yes in new game confirmation"""
-        if yes_button and yes_button.collidepoint(pos):
+    def handle_new_game_normal_click(self, pos, button):
+        """Handle klik op Normal in new game confirmation"""
+        if button and button.collidepoint(pos):
+            self.gui.assisted_setup_mode = False
             return True
         return False
     
-    def handle_new_game_no_click(self, pos, no_button):
-        """Handle klik op No in new game confirmation"""
-        if no_button and no_button.collidepoint(pos):
+    def handle_new_game_assisted_click(self, pos, button):
+        """Handle klik op Assisted in new game confirmation"""
+        if button and button.collidepoint(pos):
+            self.gui.assisted_setup_mode = True
+            self.gui.assisted_setup_step = 0
+            self.gui.assisted_setup_waiting = True
+            return True
+        return False
+    
+    def handle_new_game_cancel_click(self, pos, button):
+        """Handle klik op Cancel in new game confirmation"""
+        if button and button.collidepoint(pos):
             self.gui.show_new_game_confirm = False
             return True
         return False

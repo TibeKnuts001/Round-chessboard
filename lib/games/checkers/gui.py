@@ -120,7 +120,11 @@ class CheckersGUI:
         self.show_exit_confirm = False
         self.show_new_game_confirm = False
         self.show_stop_game_confirm = False  # Voor stop game confirmation
+        self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
         self.show_power_dropdown = False
+        self.assisted_setup_mode = False
+        self.assisted_setup_step = 0
+        self.assisted_setup_waiting = False
         self.highlighted_squares = {'destinations': [], 'intermediate': []}
         self.last_move_from = None  # Voor highlighting van laatste zet
         self.last_move_to = None
@@ -300,9 +304,14 @@ class CheckersGUI:
             result['stop_game_yes'] = stop_game_yes_button
             result['stop_game_no'] = stop_game_no_button
         elif self.show_new_game_confirm:
-            new_game_yes_button, new_game_no_button = self.dialog_renderer.draw_new_game_confirm_dialog()
-            result['new_game_yes'] = new_game_yes_button
-            result['new_game_no'] = new_game_no_button
+            new_game_normal_button, new_game_assisted_button, new_game_cancel_button = self.dialog_renderer.draw_new_game_confirm_dialog()
+            result['new_game_normal'] = new_game_normal_button
+            result['new_game_assisted'] = new_game_assisted_button
+            result['new_game_cancel'] = new_game_cancel_button
+        elif self.show_skip_setup_step_confirm:
+            skip_setup_yes_button, skip_setup_no_button = self.dialog_renderer.draw_skip_setup_step_dialog()
+            result['skip_setup_yes'] = skip_setup_yes_button
+            result['skip_setup_no'] = skip_setup_no_button
         elif self.show_settings:
             settings_result = self.draw_settings_dialog()
             result.update(settings_result)
@@ -318,7 +327,7 @@ class CheckersGUI:
         
         # Temp message overlay - alleen als GEEN dialogs open zijn
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm):
                 # Kies notification type op basis van message content
                 if 'mismatch' in temp_message.lower() or 'invalid' in temp_message.lower():
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='error')
@@ -403,14 +412,24 @@ class CheckersGUI:
             return True
         return False
     
-    def handle_new_game_yes_click(self, pos, button):
-        """Handle klik op Yes in new game confirmation"""
+    def handle_new_game_normal_click(self, pos, button):
+        """Handle klik op Normal in new game confirmation"""
         if button and button.collidepoint(pos):
+            self.assisted_setup_mode = False
             return True
         return False
     
-    def handle_new_game_no_click(self, pos, button):
-        """Handle klik op No in new game confirmation"""
+    def handle_new_game_assisted_click(self, pos, button):
+        """Handle klik op Assisted in new game confirmation"""
+        if button and button.collidepoint(pos):
+            self.assisted_setup_mode = True
+            self.assisted_setup_step = 0
+            self.assisted_setup_waiting = True
+            return True
+        return False
+    
+    def handle_new_game_cancel_click(self, pos, button):
+        """Handle klik op Cancel in new game confirmation"""
         if button and button.collidepoint(pos):
             self.show_new_game_confirm = False
             return True
@@ -426,6 +445,20 @@ class CheckersGUI:
         """Handle klik op No in stop game confirmation"""
         if button and button.collidepoint(pos):
             self.show_stop_game_confirm = False
+            return True
+        return False
+    
+    def handle_skip_setup_yes_click(self, pos, yes_button):
+        """Handle klik op Skip in skip setup step confirmation"""
+        if yes_button and yes_button.collidepoint(pos):
+            self.show_skip_setup_step_confirm = False
+            return True
+        return False
+    
+    def handle_skip_setup_no_click(self, pos, no_button):
+        """Handle klik op Wait in skip setup step confirmation"""
+        if no_button and no_button.collidepoint(pos):
+            self.show_skip_setup_step_confirm = False
             return True
         return False
     

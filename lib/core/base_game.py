@@ -441,6 +441,10 @@ class BaseGame(ABC):
                 # Lees sensors
                 current_sensors = self.read_sensors()
                 
+                # Update assisted setup als actief
+                if self.gui.assisted_setup_mode:
+                    self._update_assisted_setup_sensors()
+                
                 # Valideer board state
                 self._validate_board_if_enabled(current_sensors)
                 
@@ -458,8 +462,8 @@ class BaseGame(ABC):
                 # Handle events
                 running = self._handle_events(gui_result)
                 
-                # Detecteer sensor veranderingen (alleen als niet gepauzeerd)
-                if not self.game_paused:
+                # Detecteer sensor veranderingen (alleen als game gestart is en niet gepauzeerd)
+                if self.game_started and not self.game_paused:
                     added, removed = self.detect_changes(current_sensors, self.previous_sensor_state)
                     if added or removed:
                         self.handle_sensor_changes(added, removed)
@@ -748,8 +752,9 @@ class BaseGame(ABC):
         toggles = gui_result.get('toggles', {})
         exit_yes_button = gui_result.get('exit_yes')
         exit_no_button = gui_result.get('exit_no')
-        new_game_yes_button = gui_result.get('new_game_yes')
-        new_game_no_button = gui_result.get('new_game_no')
+        new_game_normal_button = gui_result.get('new_game_normal')
+        new_game_assisted_button = gui_result.get('new_game_assisted')
+        new_game_cancel_button = gui_result.get('new_game_cancel')
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -787,13 +792,24 @@ class BaseGame(ABC):
         toggles = gui_result.get('toggles', {})
         exit_yes_button = gui_result.get('exit_yes')
         exit_no_button = gui_result.get('exit_no')
-        new_game_yes_button = gui_result.get('new_game_yes')
-        new_game_no_button = gui_result.get('new_game_no')
+        new_game_normal_button = gui_result.get('new_game_normal')
+        new_game_assisted_button = gui_result.get('new_game_assisted')
+        new_game_cancel_button = gui_result.get('new_game_cancel')
         stop_game_yes_button = gui_result.get('stop_game_yes')
         stop_game_no_button = gui_result.get('stop_game_no')
+        skip_setup_yes_button = gui_result.get('skip_setup_yes')
+        skip_setup_no_button = gui_result.get('skip_setup_no')
+        
+        # Skip setup step confirmation dialog
+        if self.gui.show_skip_setup_step_confirm:
+            if self.gui.handle_skip_setup_yes_click(pos, skip_setup_yes_button):
+                print("\nSkipping current setup step...")
+                self._advance_setup_step()
+            elif self.gui.handle_skip_setup_no_click(pos, skip_setup_no_button):
+                pass  # Gewoon dialog sluiten en doorgaan met wachten
         
         # Exit confirmation dialog
-        if self.gui.show_exit_confirm:
+        elif self.gui.show_exit_confirm:
             if self.gui.handle_exit_yes_click(pos, exit_yes_button):
                 print("\nExiting game...")
                 return False
@@ -802,8 +818,8 @@ class BaseGame(ABC):
         
         # New game confirmation dialog
         elif self.gui.show_new_game_confirm:
-            if self.gui.handle_new_game_yes_click(pos, new_game_yes_button):
-                print("\nStarting new game...")
+            if self.gui.handle_new_game_normal_click(pos, new_game_normal_button):
+                print("\nStarting new game (normal setup)...")
                 self.engine.reset()
                 self.game_started = True  # Set to True to show "Stop Game" button
                 self.gui.show_new_game_confirm = False
@@ -820,7 +836,20 @@ class BaseGame(ABC):
                 self.leds.clear()
                 self.leds.show()
                 
-            elif self.gui.handle_new_game_no_click(pos, new_game_no_button):
+            elif self.gui.handle_new_game_assisted_click(pos, new_game_assisted_button):
+                print("\nStarting new game (assisted setup)...")
+                self.engine.reset()
+                self.game_started = False  # Blijft False tot setup compleet
+                self.gui.show_new_game_confirm = False
+                self._clear_selection()
+                
+                # Stop LED animatie - assisted setup neemt over
+                self.led_animator.stop()
+                
+                # Start assisted setup
+                self._start_assisted_setup()
+                
+            elif self.gui.handle_new_game_cancel_click(pos, new_game_cancel_button):
                 pass
         
         # Stop game confirmation dialog
@@ -906,9 +935,19 @@ class BaseGame(ABC):
     
     def _handle_game_click(self, pos):
         """Handle clicks on game board"""
-        # New game button
-        if self.gui.handle_new_game_click(pos):
+        # New Game / Stop Game button - disabled tijdens assisted setup
+        if self.gui.new_game_button.collidepoint(pos):
+            if self.gui.assisted_setup_mode:
+                # Negeer klik tijdens setup
+                return
             self._clear_selection()
+            
+            # Check of spel gestart is - zo ja, toon stop game dialog
+            if self.game_started:
+                self.gui.show_stop_game_confirm = True
+            else:
+                # Toon new game confirmation
+                self.gui.show_new_game_confirm = True
             return
         
         # Exit button
@@ -922,9 +961,14 @@ class BaseGame(ABC):
             self.temp_message = None
             return
         
-        # Board click - alleen toestaan als game gestart is
+        # Board click - verschillende modes
         clicked_square = self.gui.get_square_from_pos(pos)
         if clicked_square:
+            # Assisted setup mode - toon confirmation dialog om te skippen
+            if self.gui.assisted_setup_mode:
+                self.gui.show_skip_setup_step_confirm = True
+                return
+            
             # Check of spel gestart is
             if not self.game_started:
                 self.show_temp_message("Click 'New Game' to start playing!", duration=2000)
@@ -971,3 +1015,140 @@ class BaseGame(ABC):
         self.sensors.cleanup()
         self.gui.quit()
         print(f"{self.__class__.__name__} afgesloten")
+    
+    def _start_assisted_setup(self):
+        """Start assisted setup mode"""
+        print("Starting assisted board setup...")
+        self.gui.assisted_setup_mode = True
+        self.gui.assisted_setup_step = 0
+        self.gui.assisted_setup_waiting = True
+        self.assisted_setup_placed_squares = set()  # Track welke squares al geplaatst zijn
+        self._show_current_setup_step()
+    
+    def _get_setup_steps(self):
+        """Get ordered list of piece setup steps (game-specific, can be overridden)
+        
+        Returns:
+            List of dicts: [{'name': str, 'squares': [str], 'color': tuple}, ...]
+        """
+        # Chess setup - wit en zwart gelijktijdig per piece type
+        return [
+            {'name': 'Rooks', 'squares': ['A1', 'H1', 'A8', 'H8'], 'color': (255, 255, 255, 0)},
+            {'name': 'Knights', 'squares': ['B1', 'G1', 'B8', 'G8'], 'color': (255, 255, 255, 0)},
+            {'name': 'Bishops', 'squares': ['C1', 'F1', 'C8', 'F8'], 'color': (255, 255, 255, 0)},
+            {'name': 'Queens', 'squares': ['D1', 'D8'], 'color': (255, 255, 255, 0)},
+            {'name': 'Kings', 'squares': ['E1', 'E8'], 'color': (255, 255, 255, 0)},
+            {'name': 'Pawns', 'squares': ['A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2', 'A7', 'B7', 'C7', 'D7', 'E7', 'F7', 'G7', 'H7'], 'color': (255, 255, 255, 0)},
+        ]
+    
+    def _show_current_setup_step(self):
+        """Show current step in assisted setup"""
+        steps = self._get_setup_steps()
+        
+        if self.gui.assisted_setup_step >= len(steps):
+            # Setup compleet
+            self._finish_assisted_setup()
+            return
+        
+        current_step = steps[self.gui.assisted_setup_step]
+        print(f"Setup step {self.gui.assisted_setup_step + 1}/{len(steps)}: Place {current_step['name']}")
+        
+        self.show_temp_message(f"Place {current_step['name']}", duration=99999)
+        
+        # Light up LEDs voor pieces die nog niet geplaatst zijn
+        self.leds.clear()
+        for square in current_step['squares']:
+            if square not in self.assisted_setup_placed_squares:
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    r, g, b, w = current_step['color']
+                    self.leds.set_led(sensor_num, r, g, b, w)
+        self.leds.show()
+        
+        # Update GUI to highlight squares (alleen niet-geplaatste)
+        remaining_squares = [sq for sq in current_step['squares'] if sq not in self.assisted_setup_placed_squares]
+        self.gui.highlighted_squares = remaining_squares
+        self.gui.capture_squares = []  # No captures during setup
+    
+    def _update_assisted_setup_sensors(self):
+        """Check sensors during assisted setup and update LEDs"""
+        if not self.gui.assisted_setup_mode:
+            return
+        
+        steps = self._get_setup_steps()
+        if self.gui.assisted_setup_step >= len(steps):
+            return
+        
+        current_step = steps[self.gui.assisted_setup_step]
+        current_sensors = self.read_sensors()
+        
+        # Check welke pieces zijn toegevoegd of verwijderd
+        pieces_added = False
+        pieces_removed = False
+        
+        for square in current_step['squares']:
+            is_detected = current_sensors.get(square, False)
+            was_placed = square in self.assisted_setup_placed_squares
+            
+            if is_detected and not was_placed:
+                # Nieuw stuk geplaatst
+                self.assisted_setup_placed_squares.add(square)
+                print(f"  Piece placed on {square}")
+                
+                # Turn off LED voor dit square
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    self.leds.set_led(sensor_num, 0, 0, 0, 0)
+                pieces_added = True
+                
+            elif not is_detected and was_placed:
+                # Stuk weggehaald
+                self.assisted_setup_placed_squares.remove(square)
+                print(f"  Piece removed from {square}")
+                
+                # Turn LED terug AAN voor dit square
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    r, g, b, w = current_step['color']
+                    self.leds.set_led(sensor_num, r, g, b, w)
+                pieces_removed = True
+        
+        # Update LEDs en GUI als er iets veranderd is
+        if pieces_added or pieces_removed:
+            self.leds.show()
+            
+            # Update highlighted squares
+            remaining_squares = [sq for sq in current_step['squares'] if sq not in self.assisted_setup_placed_squares]
+            self.gui.highlighted_squares = remaining_squares
+            
+            # Update message
+            self.show_temp_message(f"Place {current_step['name']}", duration=99999)
+        
+        # Check of ALLE pieces van deze stap geplaatst zijn - alleen bij toevoegingen checken
+        if pieces_added:
+            all_placed = all(sq in self.assisted_setup_placed_squares for sq in current_step['squares'])
+            if all_placed:
+                print(f"  All pieces for step {self.gui.assisted_setup_step + 1} detected!")
+                self._advance_setup_step()
+    
+    def _advance_setup_step(self):
+        """Advance to next setup step"""
+        self.gui.assisted_setup_step += 1
+        self._show_current_setup_step()
+    
+    def _finish_assisted_setup(self):
+        """Finish assisted setup and start game"""
+        print("Assisted setup complete! Starting game...")
+        self.gui.assisted_setup_mode = False
+        self.gui.assisted_setup_step = 0
+        self.gui.assisted_setup_waiting = False
+        self.game_started = True
+        self.temp_message = None
+        
+        # Clear LEDs
+        self.leds.clear()
+        self.leds.show()
+        
+        # Clear highlights
+        self.gui.highlighted_squares = []
+        self.gui.capture_squares = []

@@ -124,7 +124,11 @@ class ChessGUI:
         self.show_exit_confirm = False
         self.show_new_game_confirm = False
         self.show_stop_game_confirm = False  # Voor stop game confirmation
+        self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
         self.show_power_dropdown = False  # Power profile dropdown open/gesloten
+        self.assisted_setup_mode = False  # Assisted setup actief
+        self.assisted_setup_step = 0  # Huidige stap in assisted setup
+        self.assisted_setup_waiting = False  # Wacht op gebruiker om door te gaan
         self.highlighted_squares = []  # Normale moves (groen)
         self.capture_squares = []  # Capture moves (rood)
         self.last_move_from = None  # Voor highlighting van laatste zet
@@ -369,15 +373,22 @@ class ChessGUI:
             stop_game_yes_button, stop_game_no_button = self.dialog_renderer.draw_stop_game_confirm_dialog()
         
         # Teken new game confirmation dialog indien nodig
-        new_game_yes_button = None
-        new_game_no_button = None
+        new_game_normal_button = None
+        new_game_assisted_button = None
+        new_game_cancel_button = None
         if self.show_new_game_confirm:
-            new_game_yes_button, new_game_no_button = self.draw_new_game_confirm_dialog()
+            new_game_normal_button, new_game_assisted_button, new_game_cancel_button = self.draw_new_game_confirm_dialog()
+        
+        # Teken skip setup step confirmation dialog indien nodig
+        skip_setup_yes_button = None
+        skip_setup_no_button = None
+        if self.show_skip_setup_step_confirm:
+            skip_setup_yes_button, skip_setup_no_button = self.dialog_renderer.draw_skip_setup_step_dialog()
         
         # Teken temp message bovenop alles (als actief en geen dialogs open)
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             # Niet tonen als er een dialog open is
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm):
                 # Parse message: kan string of tuple (message, type) zijn
                 if isinstance(temp_message, tuple):
                     message_text, notification_type = temp_message
@@ -406,8 +417,11 @@ class ChessGUI:
             'exit_no': exit_no_button,
             'stop_game_yes': stop_game_yes_button,
             'stop_game_no': stop_game_no_button,
-            'new_game_yes': new_game_yes_button,
-            'new_game_no': new_game_no_button
+            'new_game_normal': new_game_normal_button,
+            'new_game_assisted': new_game_assisted_button,
+            'new_game_cancel': new_game_cancel_button,
+            'skip_setup_yes': skip_setup_yes_button,
+            'skip_setup_no': skip_setup_no_button
         }
     
     def handle_settings_click(self, pos):
@@ -474,15 +488,25 @@ class ChessGUI:
             return True
         return False
     
-    def handle_new_game_yes_click(self, pos, yes_button):
-        """Handle klik op Yes in new game confirmation"""
-        if yes_button and yes_button.collidepoint(pos):
+    def handle_new_game_normal_click(self, pos, button):
+        """Handle klik op Normal in new game confirmation"""
+        if button and button.collidepoint(pos):
+            self.assisted_setup_mode = False
             return True
         return False
     
-    def handle_new_game_no_click(self, pos, no_button):
-        """Handle klik op No in new game confirmation"""
-        if no_button and no_button.collidepoint(pos):
+    def handle_new_game_assisted_click(self, pos, button):
+        """Handle klik op Assisted in new game confirmation"""
+        if button and button.collidepoint(pos):
+            self.assisted_setup_mode = True
+            self.assisted_setup_step = 0
+            self.assisted_setup_waiting = True
+            return True
+        return False
+    
+    def handle_new_game_cancel_click(self, pos, button):
+        """Handle klik op Cancel in new game confirmation"""
+        if button and button.collidepoint(pos):
             self.show_new_game_confirm = False
             return True
         return False
@@ -497,6 +521,20 @@ class ChessGUI:
         """Handle klik op No in stop game confirmation"""
         if no_button and no_button.collidepoint(pos):
             self.show_stop_game_confirm = False
+            return True
+        return False
+    
+    def handle_skip_setup_yes_click(self, pos, yes_button):
+        """Handle klik op Skip in skip setup step confirmation"""
+        if yes_button and yes_button.collidepoint(pos):
+            self.show_skip_setup_step_confirm = False
+            return True
+        return False
+    
+    def handle_skip_setup_no_click(self, pos, no_button):
+        """Handle klik op Wait in skip setup step confirmation"""
+        if no_button and no_button.collidepoint(pos):
+            self.show_skip_setup_step_confirm = False
             return True
         return False
     
