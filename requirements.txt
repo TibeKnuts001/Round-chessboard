@@ -1,0 +1,6 @@
+rpi-ws281x
+spidev
+gpiozero
+RPi.GPIO
+python-chess
+pygame

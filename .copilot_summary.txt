@@ -1,0 +1,22 @@
+Stockfish Difficulty Slider Implementation - Remaining Tasks:
+
+1. Add stockfish slider handlers in lib/chessgui.py:
+   - handle_stockfish_slider_click() 
+   - handle_stockfish_slider_drag()
+   - _update_stockfish_skill_from_pos()
+
+2. Update lib/chessgui.py draw() to return stockfish_slider_rect
+
+3. Update chessgame.py:
+   - Unpack stockfish_slider_rect from gui.draw()
+   - Add event handler for stockfish slider click/drag
+
+Current status:
+✅ stockfish_skill_level setting added to settings.py  
+✅ Stockfish slider UI added to dialogs.py
+✅ _draw_general_tab returns stockfish_slider_rect
+✅ draw_settings_dialog returns stockfish_slider_rect
+✅ chessgame.py updates stockfish skill level when setting changes
+✅ GUI refresh before computer thinks (pygame.display.flip())
+
+Next: Add slider interaction handlers
