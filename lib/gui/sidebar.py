@@ -64,9 +64,11 @@ class BaseSidebarRenderer:
         self.screen.blit(title, title_rect)
         return 70  # Start y voor content
     
-    def draw_buttons(self, new_game_button, exit_button, settings_button):
+    def draw_buttons(self, new_game_button, exit_button, settings_button, game_started=False):
         """Teken alle control buttons met UIWidgets"""
-        UIWidgets.draw_button(self.screen, new_game_button, "New Game", self.font_small, is_primary=True)
+        # Button text: "Stop Game" als spel bezig is, anders "New Game"
+        new_game_text = "Stop Game" if game_started else "New Game"
+        UIWidgets.draw_button(self.screen, new_game_button, new_game_text, self.font_small, is_primary=True)
         UIWidgets.draw_button(self.screen, settings_button, "Settings", self.font_small, is_primary=False)
         UIWidgets.draw_button(self.screen, exit_button, "Exit", self.font_small, is_primary=False, is_danger=True)
     

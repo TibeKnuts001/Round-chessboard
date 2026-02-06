@@ -123,8 +123,10 @@ class ChessGUI:
         self.show_settings = False
         self.show_exit_confirm = False
         self.show_new_game_confirm = False
+        self.show_stop_game_confirm = False  # Voor stop game confirmation
         self.show_power_dropdown = False  # Power profile dropdown open/gesloten
-        self.highlighted_squares = []
+        self.highlighted_squares = []  # Normale moves (groen)
+        self.capture_squares = []  # Capture moves (rood)
         self.last_move_from = None  # Voor highlighting van laatste zet
         self.last_move_to = None
         self.dragging_slider = False
@@ -176,7 +178,7 @@ class ChessGUI:
     
     def draw_board(self):
         """Teken schaakbord"""
-        self.board_renderer.draw_board_grid(self.highlighted_squares, self.selected_piece_from)
+        self.board_renderer.draw_board_grid(self.highlighted_squares, self.selected_piece_from, self.capture_squares)
     
     def draw_coordinates(self):
         """Teken coördinaten"""
@@ -193,11 +195,17 @@ class ChessGUI:
     
     def draw_sidebar(self):
         """Teken sidebar"""
+        # Haal game_started op van de parent game instance (als die bestaat)
+        game_started = False
+        if hasattr(self, '_game_instance'):
+            game_started = getattr(self._game_instance, 'game_started', False)
+        
         self.sidebar_renderer.draw_sidebar(
             self.engine,
             self.new_game_button,
             self.exit_button,
-            self.settings_button
+            self.settings_button,
+            game_started=game_started
         )
     
     def draw_settings_dialog(self):
@@ -244,7 +252,20 @@ class ChessGUI:
         Args:
             squares: List van chess notaties zoals ['E4', 'E5']
         """
-        self.highlighted_squares = squares
+        # Splits squares in normale moves en captures
+        self.highlighted_squares = []
+        self.capture_squares = []
+        
+        for square in squares:
+            # Check of er een vijandelijk stuk staat op deze square
+            # chess.parse_square() verwacht lowercase notatie
+            piece = self.engine.board.piece_at(chess.parse_square(square.lower()))
+            if piece and piece.color != self.engine.board.turn:
+                # Dit is een capture
+                self.capture_squares.append(square)
+            else:
+                # Normale move
+                self.highlighted_squares.append(square)
     
     def set_selected_piece(self, piece, from_square):
         """
@@ -341,6 +362,12 @@ class ChessGUI:
         if self.show_exit_confirm:
             exit_yes_button, exit_no_button = self.draw_exit_confirm_dialog()
         
+        # Teken stop game confirmation dialog indien nodig
+        stop_game_yes_button = None
+        stop_game_no_button = None
+        if self.show_stop_game_confirm:
+            stop_game_yes_button, stop_game_no_button = self.dialog_renderer.draw_stop_game_confirm_dialog()
+        
         # Teken new game confirmation dialog indien nodig
         new_game_yes_button = None
         new_game_no_button = None
@@ -350,7 +377,7 @@ class ChessGUI:
         # Teken temp message bovenop alles (als actief en geen dialogs open)
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             # Niet tonen als er een dialog open is
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm):
                 # Parse message: kan string of tuple (message, type) zijn
                 if isinstance(temp_message, tuple):
                     message_text, notification_type = temp_message
@@ -377,6 +404,8 @@ class ChessGUI:
             'power_profiles': power_profiles if self.show_settings else [],
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,
+            'stop_game_yes': stop_game_yes_button,
+            'stop_game_no': stop_game_no_button,
             'new_game_yes': new_game_yes_button,
             'new_game_no': new_game_no_button
         }
@@ -431,9 +460,17 @@ class ChessGUI:
         return False
     
     def handle_new_game_click(self, pos):
-        """Handle klik op new game button"""
+        """Handle klik op new game button (wordt Stop Game tijdens spel)"""
         if self.new_game_button.collidepoint(pos):
-            self.show_new_game_confirm = True
+            # Check of spel al gestart is
+            game_started = getattr(self._game_instance, 'game_started', False) if hasattr(self, '_game_instance') else False
+            
+            if game_started:
+                # Toon stop game confirmation
+                self.show_stop_game_confirm = True
+            else:
+                # Toon new game confirmation
+                self.show_new_game_confirm = True
             return True
         return False
     
@@ -447,6 +484,19 @@ class ChessGUI:
         """Handle klik op No in new game confirmation"""
         if no_button and no_button.collidepoint(pos):
             self.show_new_game_confirm = False
+            return True
+        return False
+    
+    def handle_stop_game_yes_click(self, pos, yes_button):
+        """Handle klik op Yes in stop game confirmation"""
+        if yes_button and yes_button.collidepoint(pos):
+            return True
+        return False
+    
+    def handle_stop_game_no_click(self, pos, no_button):
+        """Handle klik op No in stop game confirmation"""
+        if no_button and no_button.collidepoint(pos):
+            self.show_stop_game_confirm = False
             return True
         return False
     
@@ -496,16 +546,8 @@ class ChessGUI:
     def handle_exit_no_click(self, pos, no_button):
         return self.events.handle_exit_no_click(pos, no_button)
     
-    def handle_new_game_click(self, pos):
-        return self.events.handle_new_game_click(pos)
-    
-    def handle_new_game_yes_click(self, pos, yes_button):
-        return self.events.handle_new_game_yes_click(pos, yes_button)
-    
-    def handle_new_game_no_click(self, pos, no_button):
-        return self.events.handle_new_game_no_click(pos, no_button)
-    
     def quit(self):
         """Sluit GUI af"""
         pygame.quit()
+
 

@@ -17,7 +17,7 @@ class CheckersSidebarRenderer(BaseSidebarRenderer):
         super().__init__(screen, board_size, sidebar_width, screen_height, font, font_small)
         self.piece_images = piece_images
     
-    def draw_sidebar(self, engine, new_game_button, exit_button, settings_button):
+    def draw_sidebar(self, engine, new_game_button, exit_button, settings_button, game_started=False):
         """Teken checkers sidebar"""
         # Background
         self.draw_background()
@@ -69,7 +69,7 @@ class CheckersSidebarRenderer(BaseSidebarRenderer):
         y_offset = self._draw_captured_with_counts(captured['black'], 'white', x_pos, y_offset)
         
         # Buttons
-        self.draw_buttons(new_game_button, exit_button, settings_button)
+        self.draw_buttons(new_game_button, exit_button, settings_button, game_started=game_started)
     
     def _draw_captured_with_counts(self, pieces, piece_color, x_start, y_start):
         """Teken captured pieces met count nummers (zelfde als chess)"""

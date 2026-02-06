@@ -33,6 +33,7 @@ from lib.hardware.leds import LEDController
 from lib.hardware.sensors import SensorReader
 from lib.hardware.mapping import ChessMapper  # TODO: Hernoemen naar BoardMapper
 from lib.settings import Settings
+from lib.effects.led_animations import LEDAnimator
 
 
 class BaseGame(ABC):
@@ -56,6 +57,7 @@ class BaseGame(ABC):
         
         # GUI (game-specifiek, wordt gemaakt door subclass)
         self.gui = self._create_gui(self.engine)
+        self.gui._game_instance = self  # Geef GUI referentie naar game voor state access
         self.screen = self.gui.screen  # Voor snelle toegang
         
         # AI opponent (game-specifiek, optioneel)
@@ -66,6 +68,7 @@ class BaseGame(ABC):
         # Shared state tracking
         self.previous_sensor_state = {}
         self.selected_square = None
+        self.game_started = False  # Spel moet gestart worden met New Game button
         self.invalid_return_position = None  # Touch-move violation tracking
         self.board_mismatch_positions = []  # Board validation errors
         self.game_paused = False  # Pause bij board mismatch
@@ -73,6 +76,10 @@ class BaseGame(ABC):
         self.temp_message = None  # Tijdelijke berichten
         self.temp_message_timer = 0  # Wanneer bericht verdwijnt
         self.last_blink_state = None  # Track LED blink state om onnodige updates te voorkomen
+        
+        # LED Animator voor idle effects
+        self.led_animator = LEDAnimator(self.leds)
+        self.led_animator.start_random_animation()  # Start animatie bij startup
         
         print(f"{self.__class__.__name__} klaar!")
     
@@ -208,22 +215,34 @@ class BaseGame(ABC):
             print(f"[SENSOR EVENT] Stuk neergezet op {pos}")
             self.handle_piece_added(pos)
     
-    def update_leds(self, positions, color=(255, 255, 255, 0)):
+    def update_leds(self, positions, color=(255, 255, 255, 0), capture_positions=None, capture_color=(255, 0, 0, 0)):
         """
         Light LEDs op specifieke posities
         
         Args:
-            positions: List van positie notaties
-            color: (r, g, b, w) tuple
+            positions: List van positie notaties (normale moves)
+            color: (r, g, b, w) tuple voor normale moves
+            capture_positions: List van positie notaties voor captures (optioneel)
+            capture_color: (r, g, b, w) tuple voor captures
         """
+        if capture_positions is None:
+            capture_positions = []
+        
         # Clear all LEDs
         self.leds.clear()
         
-        # Light up specified positions
+        # Light up normal move positions
         for pos in positions:
             sensor_num = ChessMapper.chess_to_sensor(pos)  # TODO: Gebruik board mapping
             if sensor_num is not None:
                 r, g, b, w = color
+                self.leds.set_led(sensor_num, r, g, b, w)
+        
+        # Light up capture positions (rood)
+        for pos in capture_positions:
+            sensor_num = ChessMapper.chess_to_sensor(pos)
+            if sensor_num is not None:
+                r, g, b, w = capture_color
                 self.leds.set_led(sensor_num, r, g, b, w)
         
         self.leds.show()
@@ -269,8 +288,18 @@ class BaseGame(ABC):
                 # Highlight legal move posities (geef originele legal_moves door)
                 self.gui.highlight_squares(legal_moves)
                 
-                # Light up LEDs voor legal moves (blauw)
-                self.update_leds(legal_moves, color=(0, 0, 255, 0))
+                # Light up LEDs voor legal moves
+                # Haal capture_squares op van GUI (na highlight_squares call)
+                capture_squares = getattr(self.gui, 'capture_squares', [])
+                normal_squares = getattr(self.gui, 'highlighted_squares', all_moves)
+                
+                # Groen voor normale moves, rood voor captures
+                self.update_leds(
+                    normal_squares, 
+                    color=(0, 255, 0, 0),  # Groen
+                    capture_positions=capture_squares,
+                    capture_color=(255, 0, 0, 0)  # Rood
+                )
                 
                 # Onthoud geselecteerd veld
                 self.selected_square = position
@@ -330,6 +359,9 @@ class BaseGame(ABC):
             
             if move_success:
                 print(f"  Zet: {self.selected_square} -> {position}")
+                
+                # Mark game als gestart na eerste zet
+                self.game_started = True
                 
                 # Bewaar last move voor highlighting (inclusief intermediate squares)
                 last_move_from = self.selected_square
@@ -473,16 +505,28 @@ class BaseGame(ABC):
             
             # Check invalid return state (strict touch-move violation)
             if self.invalid_return_position:
-                # ROOD knipperen voor originele positie, groen voor legal moves
+                # ROOD knipperen voor originele positie, groen/rood voor legal moves
                 if blink_on:
                     if sensor_num is not None:
                         self.leds.clear()
                         self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD
-                        # Groen voor destinations
-                        for pos in destinations:
+                        
+                        # Haal capture info op van GUI voor correcte kleuren
+                        capture_squares = getattr(self.gui, 'capture_squares', [])
+                        normal_squares = getattr(self.gui, 'highlighted_squares', destinations)
+                        
+                        # Groen voor normale moves
+                        for pos in normal_squares:
                             move_sensor = ChessMapper.chess_to_sensor(pos)
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
+                        
+                        # Rood voor captures (donkerder dan violation rood)
+                        for pos in capture_squares:
+                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            if move_sensor is not None:
+                                self.leds.set_led(move_sensor, 200, 0, 0, 0)  # Donker rood voor captures
+                        
                         # Geel voor intermediate (tussenposities bij multi-captures)
                         for pos in intermediate:
                             move_sensor = ChessMapper.chess_to_sensor(pos)
@@ -490,12 +534,26 @@ class BaseGame(ABC):
                                 self.leds.set_led(move_sensor, 255, 255, 0, 0)  # GEEL
                         self.leds.show()
                 else:
-                    # Alleen legal moves (groen/geel)
+                    # Alleen legal moves (groen/rood/geel)
                     self.leds.clear()
-                    for pos in destinations:
+                    
+                    # Haal capture info op van GUI voor correcte kleuren
+                    capture_squares = getattr(self.gui, 'capture_squares', [])
+                    normal_squares = getattr(self.gui, 'highlighted_squares', destinations)
+                    
+                    # Groen voor normale moves
+                    for pos in normal_squares:
                         move_sensor = ChessMapper.chess_to_sensor(pos)
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 0, 255, 0, 0)
+                    
+                    # Rood voor captures
+                    for pos in capture_squares:
+                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        if move_sensor is not None:
+                            self.leds.set_led(move_sensor, 255, 0, 0, 0)
+                    
+                    # Geel voor intermediate
                     for pos in intermediate:
                         move_sensor = ChessMapper.chess_to_sensor(pos)
                         if move_sensor is not None:
@@ -507,11 +565,23 @@ class BaseGame(ABC):
                     if sensor_num is not None:
                         self.leds.clear()
                         self.leds.set_led(sensor_num, 0, 0, 255, 0)  # BLAUW
-                        # Groen voor destinations
-                        for pos in destinations:
+                        
+                        # Haal capture info op van GUI voor correcte kleuren
+                        capture_squares = getattr(self.gui, 'capture_squares', [])
+                        normal_squares = getattr(self.gui, 'highlighted_squares', destinations)
+                        
+                        # Groen voor normale moves
+                        for pos in normal_squares:
                             move_sensor = ChessMapper.chess_to_sensor(pos)
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
+                        
+                        # Rood voor captures
+                        for pos in capture_squares:
+                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            if move_sensor is not None:
+                                self.leds.set_led(move_sensor, 255, 0, 0, 0)  # ROOD
+                        
                         # Geel voor intermediate
                         for pos in intermediate:
                             move_sensor = ChessMapper.chess_to_sensor(pos)
@@ -521,10 +591,24 @@ class BaseGame(ABC):
                 else:
                     # Alleen legal moves
                     self.leds.clear()
-                    for pos in destinations:
+                    
+                    # Haal capture info op van GUI voor correcte kleuren
+                    capture_squares = getattr(self.gui, 'capture_squares', [])
+                    normal_squares = getattr(self.gui, 'highlighted_squares', destinations)
+                    
+                    # Groen voor normale moves
+                    for pos in normal_squares:
                         move_sensor = ChessMapper.chess_to_sensor(pos)
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 0, 255, 0, 0)
+                    
+                    # Rood voor captures
+                    for pos in capture_squares:
+                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        if move_sensor is not None:
+                            self.leds.set_led(move_sensor, 255, 0, 0, 0)
+                    
+                    # Geel voor intermediate
                     for pos in intermediate:
                         move_sensor = ChessMapper.chess_to_sensor(pos)
                         if move_sensor is not None:
@@ -646,6 +730,8 @@ class BaseGame(ABC):
         exit_no_button = gui_result.get('exit_no')
         new_game_yes_button = gui_result.get('new_game_yes')
         new_game_no_button = gui_result.get('new_game_no')
+        stop_game_yes_button = gui_result.get('stop_game_yes')
+        stop_game_no_button = gui_result.get('stop_game_no')
         
         # Exit confirmation dialog
         if self.gui.show_exit_confirm:
@@ -660,8 +746,12 @@ class BaseGame(ABC):
             if self.gui.handle_new_game_yes_click(pos, new_game_yes_button):
                 print("\nStarting new game...")
                 self.engine.reset()
+                self.game_started = True  # Set to True to show "Stop Game" button
                 self.gui.show_new_game_confirm = False
                 self._clear_selection()
+                
+                # Stop LED animatie - spel is nu actief
+                self.led_animator.stop()
                 
                 # Reset last move highlighting
                 if hasattr(self.gui, 'set_last_move'):
@@ -672,6 +762,25 @@ class BaseGame(ABC):
                 self.leds.show()
                 
             elif self.gui.handle_new_game_no_click(pos, new_game_no_button):
+                pass
+        
+        # Stop game confirmation dialog
+        elif self.gui.show_stop_game_confirm:
+            if self.gui.handle_stop_game_yes_click(pos, stop_game_yes_button):
+                print("\nStopping game...")
+                self.engine.reset()
+                self.game_started = False  # Reset game started state
+                self.gui.show_stop_game_confirm = False
+                self._clear_selection()
+                
+                # Reset last move highlighting
+                if hasattr(self.gui, 'set_last_move'):
+                    self.gui.set_last_move(None, None)
+                
+                # Start LED animatie - spel is nu idle
+                self.led_animator.start_random_animation()
+                
+            elif self.gui.handle_stop_game_no_click(pos, stop_game_no_button):
                 pass
         
         # Settings dialog
@@ -754,9 +863,14 @@ class BaseGame(ABC):
             self.temp_message = None
             return
         
-        # Board click
+        # Board click - alleen toestaan als game gestart is
         clicked_square = self.gui.get_square_from_pos(pos)
         if clicked_square:
+            # Check of spel gestart is
+            if not self.game_started:
+                self.show_temp_message("Click 'New Game' to start playing!", duration=2000)
+                return
+            
             if self.selected_square:
                 # Klik op hetzelfde veld?
                 if clicked_square == self.selected_square:
@@ -787,6 +901,10 @@ class BaseGame(ABC):
     
     def cleanup(self):
         """Cleanup resources"""
+        # Stop LED animator
+        if hasattr(self, 'led_animator'):
+            self.led_animator.stop()
+        
         if self.ai:
             if hasattr(self.ai, 'cleanup'):
                 self.ai.cleanup()

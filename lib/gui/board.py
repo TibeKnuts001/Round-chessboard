@@ -23,7 +23,8 @@ class BaseBoardRenderer:
     # Default kleuren (kunnen worden overschreven)
     COLOR_LIGHT_SQUARE = (240, 217, 181)
     COLOR_DARK_SQUARE = (181, 136, 99)
-    COLOR_HIGHLIGHT = (186, 202, 68)
+    COLOR_HIGHLIGHT = (186, 202, 68)  # Groen voor normale moves
+    COLOR_CAPTURE = (220, 80, 80)  # Rood voor captures
     COLOR_SELECTION = (255, 215, 0)
     COLOR_WHITE = (255, 255, 255)
     COLOR_BLACK = (0, 0, 0)
@@ -42,14 +43,18 @@ class BaseBoardRenderer:
         self.font_small = font_small
         self.font = pygame.font.Font(None, 36)
     
-    def draw_board_grid(self, highlighted_squares, selected_square):
+    def draw_board_grid(self, highlighted_squares, selected_square, capture_squares=None):
         """
         Teken het basis 8x8 grid met highlights
         
         Args:
-            highlighted_squares: List van square notaties voor highlights
+            highlighted_squares: List van square notaties voor normale moves
             selected_square: Notatie van geselecteerd veld of None
+            capture_squares: List van square notaties voor captures (rood)
         """
+        if capture_squares is None:
+            capture_squares = []
+        
         for row in range(8):
             for col in range(8):
                 # Bepaal kleur
@@ -58,7 +63,12 @@ class BaseBoardRenderer:
                 
                 # Check of veld highlighted moet zijn
                 square_notation = self._get_square_notation(row, col)
-                if square_notation in highlighted_squares:
+                
+                # Capture squares krijgen rode achtergrond
+                if square_notation in capture_squares:
+                    color = self.COLOR_CAPTURE
+                # Normale move squares krijgen groene achtergrond
+                elif square_notation in highlighted_squares:
                     color = self.COLOR_HIGHLIGHT
                 
                 # Teken veld
@@ -70,7 +80,7 @@ class BaseBoardRenderer:
                 )
                 pygame.draw.rect(self.screen, color, rect)
                 
-                # Teken selectie indicator
+                # Teken selectie indicator (gouden knipperende cirkel)
                 if selected_square and square_notation == selected_square:
                     self._draw_selection_indicator(col, row)
     

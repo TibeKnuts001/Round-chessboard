@@ -119,6 +119,7 @@ class CheckersGUI:
         self.show_settings = False
         self.show_exit_confirm = False
         self.show_new_game_confirm = False
+        self.show_stop_game_confirm = False  # Voor stop game confirmation
         self.show_power_dropdown = False
         self.highlighted_squares = {'destinations': [], 'intermediate': []}
         self.last_move_from = None  # Voor highlighting van laatste zet
@@ -220,11 +221,17 @@ class CheckersGUI:
     
     def draw_sidebar(self):
         """Teken sidebar (hergebruikt SidebarRenderer)"""
+        # Haal game_started op van de parent game instance (als die bestaat)
+        game_started = False
+        if hasattr(self, '_game_instance'):
+            game_started = getattr(self._game_instance, 'game_started', False)
+        
         self.sidebar_renderer.draw_sidebar(
             self.engine,
             self.new_game_button,
             self.exit_button,
-            self.settings_button
+            self.settings_button,
+            game_started=game_started
         )
     
     def draw_settings_dialog(self):
@@ -288,6 +295,10 @@ class CheckersGUI:
             exit_yes_button, exit_no_button = self.dialog_renderer.draw_exit_confirm_dialog()
             result['exit_yes'] = exit_yes_button
             result['exit_no'] = exit_no_button
+        elif self.show_stop_game_confirm:
+            stop_game_yes_button, stop_game_no_button = self.dialog_renderer.draw_stop_game_confirm_dialog()
+            result['stop_game_yes'] = stop_game_yes_button
+            result['stop_game_no'] = stop_game_no_button
         elif self.show_new_game_confirm:
             new_game_yes_button, new_game_no_button = self.dialog_renderer.draw_new_game_confirm_dialog()
             result['new_game_yes'] = new_game_yes_button
@@ -307,7 +318,7 @@ class CheckersGUI:
         
         # Temp message overlay - alleen als GEEN dialogs open zijn
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm):
                 # Kies notification type op basis van message content
                 if 'mismatch' in temp_message.lower() or 'invalid' in temp_message.lower():
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='error')
@@ -346,9 +357,17 @@ class CheckersGUI:
     
     # Event handler delegations
     def handle_new_game_click(self, pos):
-        """Handle klik op new game button"""
+        """Handle klik op new game button (wordt Stop Game tijdens spel)"""
         if self.new_game_button.collidepoint(pos):
-            self.show_new_game_confirm = True
+            # Check of spel al gestart is
+            game_started = getattr(self._game_instance, 'game_started', False) if hasattr(self, '_game_instance') else False
+            
+            if game_started:
+                # Toon stop game confirmation
+                self.show_stop_game_confirm = True
+            else:
+                # Toon new game confirmation
+                self.show_new_game_confirm = True
             return True
         return False
     
@@ -394,6 +413,19 @@ class CheckersGUI:
         """Handle klik op No in new game confirmation"""
         if button and button.collidepoint(pos):
             self.show_new_game_confirm = False
+            return True
+        return False
+    
+    def handle_stop_game_yes_click(self, pos, button):
+        """Handle klik op Yes in stop game confirmation"""
+        if button and button.collidepoint(pos):
+            return True
+        return False
+    
+    def handle_stop_game_no_click(self, pos, button):
+        """Handle klik op No in stop game confirmation"""
+        if button and button.collidepoint(pos):
+            self.show_stop_game_confirm = False
             return True
         return False
     
