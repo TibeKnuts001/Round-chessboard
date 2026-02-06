@@ -1,48 +1,30 @@
 #!/usr/bin/env python3
 """
-Board Rendering Module
+Base Board Renderer
 
-Handelt alle visuele weergave van het schaakbord:
-velden, stukken, coördinaten, highlights en debug overlays.
+Tekent het basis 8x8 board met:
+- Afwisselende light/dark squares
+- Square highlights
+- Selection indicators
+- Debug overlays
 
-Functionaliteit:
-- 8x8 schaakbord rendering met afwisselende kleuren
-- Chess piece rendering via SVG sprites (64x64 pixels)
-- Coordinate labels (A-H horizontaal, 1-8 verticaal)
-- Selected piece highlighting (gele border)
-- Drag-and-drop visualization (stuk volgt muis)
-- Debug mode: sensor detection overlay (rood/groen vakken)
-
-Assets:
-- Piece sprites: assets/pieces/*.svg (12 files voor elke stuk/kleur)
-- Layout: 640x640 pixel board (80x80 per veld)
-
-Visuele feedback:
-- Light squares: (240, 217, 181) beige
-- Dark squares: (181, 136, 99) bruin  
-- Selected: gele 4px border
-- Debug occupied: rood overlay (sensor triggered)
-- Debug empty: groen overlay (no sensor signal)
-
-Hoofdklasse:
-- BoardRenderer: Static drawing methods voor board components
-
-Wordt gebruikt door: ChessGUI.draw()
+Game-specifieke renderers extenden deze class voor:
+- Piece rendering
+- Coördinaat labels
+- Specifieke kleuren
 """
 
-import os
 import pygame
-import chess
 
 
-class BoardRenderer:
-    """Tekent het schaakbord en pieces"""
+class BaseBoardRenderer:
+    """Base class voor board rendering"""
     
-    # Kleuren
+    # Default kleuren (kunnen worden overschreven)
     COLOR_LIGHT_SQUARE = (240, 217, 181)
     COLOR_DARK_SQUARE = (181, 136, 99)
     COLOR_HIGHLIGHT = (186, 202, 68)
-    COLOR_SELECTION = (255, 215, 0)  # Goud voor geselecteerd veld
+    COLOR_SELECTION = (255, 215, 0)
     COLOR_WHITE = (255, 255, 255)
     COLOR_BLACK = (0, 0, 0)
     
@@ -58,71 +40,15 @@ class BoardRenderer:
         self.board_size = board_size
         self.square_size = square_size
         self.font_small = font_small
-        self.font = pygame.font.Font(None, 36)  # Voor debug overlays
-        
-        # Laad piece images
-        self.piece_images = self._load_piece_images()
+        self.font = pygame.font.Font(None, 36)
     
-    def _load_piece_images(self):
+    def draw_board_grid(self, highlighted_squares, selected_square):
         """
-        Laad en schaal chess piece images
-        
-        Returns:
-            Dict met piece symbols als keys en pygame surfaces als values
-        """
-        # Piece mapping: python-chess symbol -> filename
-        piece_files = {
-            'P': 'white_pawn.png',
-            'N': 'white_knight.png',
-            'B': 'white_bishop.png',
-            'R': 'white_rook.png',
-            'Q': 'white_queen.png',
-            'K': 'white_king.png',
-            'p': 'black_pawn.png',
-            'n': 'black_knight.png',
-            'b': 'black_bishop.png',
-            'r': 'black_rook.png',
-            'q': 'black_queen.png',
-            'k': 'black_king.png',
-        }
-        
-        # Target size: 75% van square size voor mooie padding
-        target_size = int(self.square_size * 0.75)
-        
-        # Load en schaal images
-        images = {}
-        # Navigate to assets from lib/gui/board.py
-        assets_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'assets',
-            'chess_pieces'
-        )
-        
-        for symbol, filename in piece_files.items():
-            filepath = os.path.join(assets_path, filename)
-            
-            # Check of file bestaat
-            if not os.path.exists(filepath):
-                raise FileNotFoundError(
-                    f"Chess piece image niet gevonden: {filepath}\n"
-                    f"Plaats de PNG files in assets/chess_pieces/\n"
-                    f"Zie assets/README.txt voor details."
-                )
-            
-            # Laad en schaal image
-            image = pygame.image.load(filepath)
-            scaled_image = pygame.transform.smoothscale(image, (target_size, target_size))
-            images[symbol] = scaled_image
-        
-        return images
-    
-    def draw_board(self, highlighted_squares, selected_piece_from):
-        """
-        Teken schaakbord met highlights en selectie
+        Teken het basis 8x8 grid met highlights
         
         Args:
-            highlighted_squares: List van chess notaties voor highlighted velden
-            selected_piece_from: Chess notatie van geselecteerd veld of None
+            highlighted_squares: List van square notaties voor highlights
+            selected_square: Notatie van geselecteerd veld of None
         """
         for row in range(8):
             for col in range(8):
@@ -131,8 +57,8 @@ class BoardRenderer:
                 color = self.COLOR_LIGHT_SQUARE if is_light else self.COLOR_DARK_SQUARE
                 
                 # Check of veld highlighted moet zijn
-                chess_pos = f"{chr(65 + col)}{8 - row}"
-                if chess_pos in highlighted_squares:
+                square_notation = self._get_square_notation(row, col)
+                if square_notation in highlighted_squares:
                     color = self.COLOR_HIGHLIGHT
                 
                 # Teken veld
@@ -144,129 +70,77 @@ class BoardRenderer:
                 )
                 pygame.draw.rect(self.screen, color, rect)
                 
-                # Teken selectie cirkel als dit het geselecteerde veld is (met knippereffect)
-                if selected_piece_from and chess_pos == selected_piece_from:
-                    # Bereken knipperstaat (500ms aan, 500ms uit)
-                    blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
-                    
-                    if blink_on:
-                        center_x = col * self.square_size + self.square_size // 2
-                        center_y = row * self.square_size + self.square_size // 2
-                        radius = self.square_size // 2 - 5
-                        # Teken dikke cirkel (meerdere cirkels voor dikte)
-                        for i in range(5):
-                            pygame.draw.circle(
-                                self.screen,
-                                self.COLOR_SELECTION,
-                                (center_x, center_y),
-                                radius - i,
-                                1
-                            )
+                # Teken selectie indicator
+                if selected_square and square_notation == selected_square:
+                    self._draw_selection_indicator(col, row)
     
-    def draw_coordinates(self):
-        """Teken coördinaten over de stukken heen met outline"""
-        for i in range(8):
-            # Files (A-H) onderaan op laatste rij
-            letter = chr(65 + i)
-            x = i * self.square_size + self.square_size - 15
-            y = 7 * self.square_size + self.square_size - 20
-            
-            # Teken zwarte outline (rond de tekst)
-            for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1), (-1,0), (1,0), (0,-1), (0,1)]:
-                outline = self.font_small.render(letter, True, self.COLOR_BLACK)
-                self.screen.blit(outline, (x + dx, y + dy))
-            
-            # Teken witte tekst
-            label = self.font_small.render(letter, True, self.COLOR_WHITE)
-            self.screen.blit(label, (x, y))
-            
-            # Ranks (1-8) links op eerste kolom
-            number = str(8 - i)
-            nx = 5
-            ny = i * self.square_size + 5
-            
-            # Teken zwarte outline
-            for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1), (-1,0), (1,0), (0,-1), (0,1)]:
-                outline = self.font_small.render(number, True, self.COLOR_BLACK)
-                self.screen.blit(outline, (nx + dx, ny + dy))
-            
-            # Teken witte tekst
-            label = self.font_small.render(number, True, self.COLOR_WHITE)
-            self.screen.blit(label, (nx, ny))
-    
-    def draw_pieces(self, board):
-        """
-        Teken schaakstukken met PNG images
+    def _draw_selection_indicator(self, col, row):
+        """Teken selectie indicator met knippereffect"""
+        blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
         
-        Args:
-            board: python-chess Board object
-        """
-        for row in range(8):
-            for col in range(8):
-                square = chess.square(col, 7 - row)
-                piece = board.piece_at(square)
-                
-                if piece:
-                    # Haal image op
-                    image = self.piece_images[piece.symbol()]
-                    
-                    # Center image in square
-                    image_rect = image.get_rect(
-                        center=(
-                            col * self.square_size + self.square_size // 2,
-                            row * self.square_size + self.square_size // 2
-                        )
-                    )
-                    self.screen.blit(image, image_rect)
+        if blink_on:
+            center_x = col * self.square_size + self.square_size // 2
+            center_y = row * self.square_size + self.square_size // 2
+            radius = self.square_size // 2 - 5
+            
+            # Teken dikke cirkel
+            for i in range(5):
+                pygame.draw.circle(
+                    self.screen,
+                    self.COLOR_SELECTION,
+                    (center_x, center_y),
+                    radius - i,
+                    1
+                )
     
     def draw_debug_overlays(self, active_sensor_states):
         """
-        Teken debug overlays (boven de pieces)
+        Teken debug overlays voor sensor detection
         
         Args:
-            active_sensor_states: Dict met chess notaties en sensor states
+            active_sensor_states: Dict met square notaties en sensor states
         """
-        # Teken magneet indicators voor actieve sensors
         for row in range(8):
             for col in range(8):
-                chess_pos = f"{chr(65 + col)}{8 - row}"
+                square_notation = self._get_square_notation(row, col)
                 
-                if chess_pos in active_sensor_states and active_sensor_states[chess_pos]:
-                    # Teken geel magneet symbool in midden van veld
+                if square_notation in active_sensor_states and active_sensor_states[square_notation]:
                     center_x = col * self.square_size + self.square_size // 2
                     center_y = row * self.square_size + self.square_size // 2
                     
                     indicator_radius = 18
                     
-                    # Gele cirkel als achtergrond
+                    # Gele cirkel met M voor magneet
                     pygame.draw.circle(self.screen, (255, 215, 0), (center_x, center_y), indicator_radius)
                     pygame.draw.circle(self.screen, (200, 170, 0), (center_x, center_y), indicator_radius, 2)
                     
-                    # Teken "M" voor magneet
                     magnet_text = self.font.render("M", True, self.COLOR_BLACK)
                     text_rect = magnet_text.get_rect(center=(center_x, center_y))
                     self.screen.blit(magnet_text, text_rect)
     
     def get_square_from_pos(self, pos):
         """
-        Converteer muis positie naar chess square notatie
+        Converteer muis positie naar square notatie
+        Moet worden geïmplementeerd door subclass
         
         Args:
             pos: (x, y) tuple van muis positie
             
         Returns:
-            String zoals "E2" of None als niet op bord geklikt
+            String met square notatie of None
         """
-        x, y = pos
+        raise NotImplementedError("Subclass must implement get_square_from_pos()")
+    
+    def _get_square_notation(self, row, col):
+        """
+        Converteer row/col naar square notatie
+        Moet worden geïmplementeerd door subclass
         
-        # Check of klik binnen bord is
-        if x < 0 or x >= self.board_size or y < 0 or y >= self.board_size:
-            return None
-        
-        # Converteer naar kolom en rij
-        col = x // self.square_size
-        row = 7 - (y // self.square_size)  # Flip voor chess coördinaten
-        
-        # Converteer naar chess notatie
-        files = 'ABCDEFGH'
-        return f"{files[col]}{row + 1}"
+        Args:
+            row: Row index (0-7)
+            col: Column index (0-7)
+            
+        Returns:
+            String met square notatie (bijv "E2" voor chess of "12" voor checkers)
+        """
+        raise NotImplementedError("Subclass must implement _get_square_notation()")

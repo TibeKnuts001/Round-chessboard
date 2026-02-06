@@ -38,6 +38,7 @@ Wordt gebruikt door: ChessGUI (via self.events delegation)
 """
 
 import pygame
+from lib.settings import Settings
 
 
 class EventHandlers:
@@ -57,7 +58,7 @@ class EventHandlers:
         if self.gui.settings_button.collidepoint(pos):
             self.gui.show_settings = True
             # Kopieer huidige settings naar temp bij openen
-            self.gui.temp_settings = self.gui.settings.settings.copy()
+            self.gui.temp_settings = self.gui.settings.get_temp_copy()
             return True
         return False
     
@@ -80,30 +81,16 @@ class EventHandlers:
         
         Args:
             pos: Mouse position (x, y)
-            tabs_dict: Dict with keys 'general', 'stockfish', 'gameplay', 'debug' containing tab rects
+            tabs_dict: Dict met tab keys -> rects (disabled tabs hebben None als rect)
         
         Returns:
             bool: True if tab was clicked, False otherwise
         """
-        # Check general tab
-        if tabs_dict.get('general') and tabs_dict['general'].collidepoint(pos):
-            self.gui.active_settings_tab = 'general'
-            return True
-        
-        # Check stockfish tab (only exists when VS Computer is on)
-        if tabs_dict.get('stockfish') and tabs_dict['stockfish'].collidepoint(pos):
-            self.gui.active_settings_tab = 'stockfish'
-            return True
-        
-        # Check gameplay tab
-        if tabs_dict.get('gameplay') and tabs_dict['gameplay'].collidepoint(pos):
-            self.gui.active_settings_tab = 'gameplay'
-            return True
-        
-        # Check debug tab
-        if tabs_dict.get('debug') and tabs_dict['debug'].collidepoint(pos):
-            self.gui.active_settings_tab = 'debug'
-            return True
+        # Check alle tabs generiek (loop over dict)
+        for tab_key, tab_rect in tabs_dict.items():
+            if tab_rect and tab_rect.collidepoint(pos):
+                self.gui.active_settings_tab = tab_key
+                return True
         
         return False
     
@@ -114,8 +101,9 @@ class EventHandlers:
         if toggle_rect and toggle_rect.collidepoint(pos):
             # Toggle tijdelijk (niet permanent opslaan)
             if not self.gui.temp_settings:
-                self.gui.temp_settings = self.gui.settings.settings.copy()
-            self.gui.temp_settings['show_coordinates'] = not self.gui.temp_settings.get('show_coordinates', True)
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'show_coordinates', True)
+            Settings.set_in_dict(self.gui.temp_settings, 'show_coordinates', not current_value)
             return True
         return False
     
@@ -124,8 +112,9 @@ class EventHandlers:
         if toggle_rect and toggle_rect.collidepoint(pos):
             # Toggle tijdelijk (niet permanent opslaan)
             if not self.gui.temp_settings:
-                self.gui.temp_settings = self.gui.settings.settings.copy()
-            self.gui.temp_settings['debug_sensors'] = not self.gui.temp_settings.get('debug_sensors', False)
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'debug_sensors', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'debug_sensors', not current_value)
             return True
         return False
     
@@ -134,8 +123,9 @@ class EventHandlers:
         if toggle_rect and toggle_rect.collidepoint(pos):
             # Toggle tijdelijk (niet permanent opslaan)
             if not self.gui.temp_settings:
-                self.gui.temp_settings = self.gui.settings.settings.copy()
-            self.gui.temp_settings['play_vs_computer'] = not self.gui.temp_settings.get('play_vs_computer', False)
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'play_vs_computer', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'play_vs_computer', not current_value)
             return True
         return False
     
@@ -144,8 +134,9 @@ class EventHandlers:
         if toggle_rect and toggle_rect.collidepoint(pos):
             # Toggle tijdelijk (niet permanent opslaan)
             if not self.gui.temp_settings:
-                self.gui.temp_settings = self.gui.settings.settings.copy()
-            self.gui.temp_settings['strict_touch_move'] = not self.gui.temp_settings.get('strict_touch_move', False)
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'strict_touch_move', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'strict_touch_move', not current_value)
             return True
         return False
     
@@ -154,8 +145,9 @@ class EventHandlers:
         if toggle_rect and toggle_rect.collidepoint(pos):
             # Toggle tijdelijk (niet permanent opslaan)
             if not self.gui.temp_settings:
-                self.gui.temp_settings = self.gui.settings.settings.copy()
-            self.gui.temp_settings['validate_board_state'] = not self.gui.temp_settings.get('validate_board_state', True)
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'validate_board_state', True)
+            Settings.set_in_dict(self.gui.temp_settings, 'validate_board_state', not current_value)
             return True
         return False
     
@@ -252,8 +244,8 @@ class EventHandlers:
         
         # Store temporarily (not permanent)
         if not self.gui.temp_settings:
-            self.gui.temp_settings = self.gui.settings.settings.copy()
-        self.gui.temp_settings[setting_key] = value
+            self.gui.temp_settings = self.gui.settings.get_temp_copy()
+        Settings.set_in_dict(self.gui.temp_settings, setting_key, value)
     
     def handle_brightness_slider_click(self, pos, slider_rect):
         """Handle brightness slider click to start dragging"""
@@ -288,18 +280,17 @@ class EventHandlers:
         
         # Cap brightness based on power profile
         if not self.gui.temp_settings:
-            self.gui.temp_settings = self.gui.settings.settings.copy()
+            self.gui.temp_settings = self.gui.settings.get_temp_copy()
         
         max_brightness = self.gui.settings.get_max_brightness()
         # Als temp_settings een ander power profile heeft, gebruik die
-        if 'power_profile' in self.gui.temp_settings:
-            from lib.settings import Settings
-            max_brightness = Settings.POWER_PROFILES.get(self.gui.temp_settings['power_profile'], 60)
+        power_profile = Settings.get_from_dict(self.gui.temp_settings, 'power_profile', 1.5)
+        max_brightness = Settings.POWER_PROFILES.get(power_profile, 60)
         
         brightness = min(brightness, max_brightness)
         
         # Sla tijdelijk op (niet permanent)
-        self.gui.temp_settings['brightness'] = brightness
+        Settings.set_in_dict(self.gui.temp_settings, 'brightness', brightness)
     
     def handle_skill_slider_click(self, pos, slider_rect):
         """Handle stockfish skill slider click to start dragging"""
@@ -328,7 +319,7 @@ class EventHandlers:
         
         # Sla tijdelijk op (niet permanent)
         if not self.gui.temp_settings:
-            self.gui.temp_settings = self.gui.settings.settings.copy()
+            self.gui.temp_settings = self.gui.settings.get_temp_copy()
         self.gui.temp_settings['stockfish_skill_level'] = skill_level
     
     # Stockfish tab slider handlers
@@ -406,17 +397,16 @@ class EventHandlers:
             
             if rect.collidepoint(pos):
                 if not self.gui.temp_settings:
-                    self.gui.temp_settings = self.gui.settings.settings.copy()
+                    self.gui.temp_settings = self.gui.settings.get_temp_copy()
                 
                 # Update power profile
-                self.gui.temp_settings['power_profile'] = value
+                Settings.set_in_dict(self.gui.temp_settings, 'power_profile', value)
                 
                 # Cap brightness if needed
-                from lib.settings import Settings
                 max_brightness = Settings.POWER_PROFILES.get(value, 60)
-                current_brightness = self.gui.temp_settings.get('brightness', 20)
+                current_brightness = Settings.get_from_dict(self.gui.temp_settings, 'brightness', 20)
                 if current_brightness > max_brightness:
-                    self.gui.temp_settings['brightness'] = max_brightness
+                    Settings.set_in_dict(self.gui.temp_settings, 'brightness', max_brightness)
                 
                 # Close dropdown
                 self.gui.show_power_dropdown = False

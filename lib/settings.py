@@ -52,20 +52,97 @@ class Settings:
         2.5: 100,  # Maximum
     }
     
-    # Default settings
+    # Default settings (gestructureerd in secties)
     DEFAULTS = {
-        'show_coordinates': True,
-        'brightness': 20,
-        'debug_sensors': False,
-        'play_vs_computer': False,
-        'stockfish_skill_level': 10,  # 0-20 (0=zwakst, 20=sterkst)
-        'stockfish_think_time': 1000,  # Denktijd in ms (500-5000)
-        'stockfish_depth': 15,  # Maximale zoekdiepte (5-25)
-        'stockfish_threads': 1,  # Aantal CPU threads (1-4)
-        'strict_touch_move': False,  # Touch-move regel: mag niet terugzetten op originele positie
-        'validate_board_state': True,  # Valideer fysiek bord vs engine state (pause bij mismatch)
-        'power_profile': 1.5,  # Power limit in Ampere (0.5, 1.0, 1.5, 2.0, 2.5)
+        'hardware': {
+            'brightness': 20,
+            'power_profile': 1.5,  # Power limit in Ampere (0.5, 1.0, 1.5, 2.0, 2.5)
+        },
+        'debug': {
+            'show_coordinates': True,
+            'debug_sensors': False,
+            'validate_board_state': True,  # Valideer fysiek bord vs engine state
+        },
+        'chess': {
+            'play_vs_computer': False,
+            'strict_touch_move': False,  # Touch-move regel
+            'stockfish_skill_level': 10,  # 0-20 (0=zwakst, 20=sterkst)
+            'stockfish_think_time': 1000,  # Denktijd in ms (500-5000)
+            'stockfish_depth': 15,  # Maximale zoekdiepte (5-25)
+            'stockfish_threads': 1,  # Aantal CPU threads (1-4)
+        },
+        'checkers': {
+            # Checkers-specifieke settings kunnen hier later toegevoegd worden
+        }
     }
+    
+    # Map setting keys to their sections (voor backward compatibility)
+    KEY_TO_SECTION = {
+        # Hardware
+        'brightness': 'hardware',
+        'power_profile': 'hardware',
+        # Debug
+        'show_coordinates': 'debug',
+        'debug_sensors': 'debug',
+        'validate_board_state': 'debug',
+        # Chess
+        'play_vs_computer': 'chess',
+        'strict_touch_move': 'chess',
+        'stockfish_skill_level': 'chess',
+        'stockfish_think_time': 'chess',
+        'stockfish_depth': 'chess',
+        'stockfish_threads': 'chess',
+    }
+    
+    @staticmethod
+    def set_in_dict(settings_dict, key, value, section=None):
+        """
+        Helper om waarde te zetten in settings dict (voor temp_settings)
+        
+        Args:
+            settings_dict: De settings dict (kan nested zijn met sections)
+            key: Setting key
+            value: Nieuwe waarde
+            section: Optional sectie naam
+        """
+        if section:
+            if section not in settings_dict:
+                settings_dict[section] = {}
+            settings_dict[section][key] = value
+        else:
+            # Gebruik KEY_TO_SECTION mapping
+            target_section = Settings.KEY_TO_SECTION.get(key)
+            if target_section:
+                if target_section not in settings_dict:
+                    settings_dict[target_section] = {}
+                settings_dict[target_section][key] = value
+            else:
+                # Onbekende key: zet direct (voor backward compatibility met flat dicts)
+                settings_dict[key] = value
+    
+    @staticmethod
+    def get_from_dict(settings_dict, key, default=None, section=None):
+        """
+        Helper om waarde uit settings dict te halen (voor temp_settings)
+        
+        Args:
+            settings_dict: De settings dict (kan nested zijn met sections)
+            key: Setting key
+            default: Default waarde
+            section: Optional sectie naam
+        
+        Returns:
+            Setting waarde
+        """
+        if section:
+            return settings_dict.get(section, {}).get(key, default)
+        else:
+            # Zoek in alle secties
+            for section_dict in settings_dict.values():
+                if isinstance(section_dict, dict) and key in section_dict:
+                    return section_dict[key]
+            # Als niet gevonden, probeer direct (backward compatibility)
+            return settings_dict.get(key, default)
     
     def __init__(self, settings_file='settings.json'):
         """
@@ -75,8 +152,13 @@ class Settings:
             settings_file: Pad naar settings bestand
         """
         self.settings_file = settings_file
-        self.settings = self.DEFAULTS.copy()
+        self.settings = self._deep_copy_defaults()
         self.load()
+    
+    def _deep_copy_defaults(self):
+        """Maak deep copy van DEFAULTS dict"""
+        import copy
+        return copy.deepcopy(self.DEFAULTS)
     
     def load(self):
         """Laad settings van disk, gebruik defaults als bestand niet bestaat"""
@@ -84,8 +166,8 @@ class Settings:
             try:
                 with open(self.settings_file, 'r') as f:
                     loaded_settings = json.load(f)
-                    # Update settings met geladen waarden
-                    self.settings.update(loaded_settings)
+                    # Deep merge: update nested dicts
+                    self._deep_update(self.settings, loaded_settings)
                 print(f"Settings geladen van {self.settings_file}")
             except Exception as e:
                 print(f"Fout bij laden settings: {e}")
@@ -93,6 +175,14 @@ class Settings:
         else:
             print("Geen settings bestand gevonden, gebruik defaults")
             self.save()  # Maak settings.json met defaults
+    
+    def _deep_update(self, base_dict, update_dict):
+        """Update nested dictionary recursively"""
+        for key, value in update_dict.items():
+            if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
+                self._deep_update(base_dict[key], value)
+            else:
+                base_dict[key] = value
     
     def save(self):
         """Sla settings op naar disk"""
@@ -103,23 +193,111 @@ class Settings:
         except Exception as e:
             print(f"Fout bij opslaan settings: {e}")
     
-    def get(self, key, default=None):
-        """Haal setting op"""
-        return self.settings.get(key, default)
+    def get(self, key, default=None, section=None):
+        """
+        Haal setting op (backwards compatible + nieuwe sectie support)
+        
+        Args:
+            key: Setting key
+            default: Default waarde als key niet bestaat
+            section: Optional sectie naam (hardware, debug, chess, checkers)
+        
+        Returns:
+            Setting waarde
+        """
+        if section:
+            # Nieuwe manier: get('brightness', section='hardware')
+            return self.settings.get(section, {}).get(key, default)
+        else:
+            # Backwards compatible: zoek in alle secties
+            for section_dict in self.settings.values():
+                if isinstance(section_dict, dict) and key in section_dict:
+                    return section_dict[key]
+            return default
     
-    def set(self, key, value):
-        """Zet setting en sla op"""
-        self.settings[key] = value
-        self.save()
+    def set(self, key, value, section=None):
+        """
+        Zet setting waarde
+        
+        Args:
+            key: Setting key
+            value: Nieuwe waarde
+            section: Optional sectie naam (hardware, debug, chess, checkers)
+        """
+        if section:
+            # Nieuwe manier: set('brightness', 50, section='hardware')
+            if section not in self.settings:
+                self.settings[section] = {}
+            self.settings[section][key] = value
+        else:
+            # Backwards compatible: gebruik KEY_TO_SECTION mapping
+            target_section = self.KEY_TO_SECTION.get(key)
+            if target_section:
+                if target_section not in self.settings:
+                    self.settings[target_section] = {}
+                self.settings[target_section][key] = value
+            else:
+                # Onbekende key: probeer te vinden in bestaande secties
+                for section_name, section_dict in self.settings.items():
+                    if isinstance(section_dict, dict) and key in section_dict:
+                        section_dict[key] = value
+                        return
+                # Als helemaal niet gevonden, zet in 'general' sectie
+                if 'general' not in self.settings:
+                    self.settings['general'] = {}
+                self.settings['general'][key] = value
     
-    def toggle(self, key):
-        """Toggle boolean setting"""
-        if key in self.settings and isinstance(self.settings[key], bool):
-            self.settings[key] = not self.settings[key]
-            self.save()
-            return self.settings[key]
+    def get_section(self, section):
+        """
+        Haal hele sectie op
+        
+        Args:
+            section: Sectie naam (hardware, debug, chess, checkers)
+        
+        Returns:
+            Dict met alle settings in sectie
+        """
+        return self.settings.get(section, {})
+    
+    def update_section(self, section, updates):
+        """
+        Update meerdere settings in een sectie
+        
+        Args:
+            section: Sectie naam
+            updates: Dict met key->value updates
+        """
+        if section not in self.settings:
+            self.settings[section] = {}
+        self.settings[section].update(updates)
+    
+    def toggle(self, key, section=None):
+        """
+        Toggle boolean setting
+        
+        Args:
+            key: Setting key
+            section: Optional sectie naam
+        
+        Returns:
+            Nieuwe waarde
+        """
+        current_value = self.get(key, False, section=section)
+        new_value = not current_value
+        self.set(key, new_value, section=section)
+        return new_value
     
     def get_max_brightness(self):
         """Get max brightness % allowed by current power profile"""
-        power_limit = self.settings.get('power_profile', 1.5)
+        power_limit = self.get('power_profile', 1.5, section='hardware')
         return self.POWER_PROFILES.get(power_limit, 60)
+    
+    def get_temp_copy(self):
+        """
+        Maak deep copy van huidige settings voor temp editing
+        
+        Returns:
+            Deep copy van self.settings dict
+        """
+        import copy
+        return copy.deepcopy(self.settings)

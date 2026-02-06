@@ -1,0 +1,698 @@
+#!/usr/bin/env python3
+"""
+Base Game Class
+
+Abstracte base class met alle herbruikbare game loop logic.
+Bevat alle functionaliteit die gedeeld wordt tussen chess, checkers, etc.
+
+Shared functionaliteit:
+- Hardware interface (LEDs, sensors)
+- Sensor reading en change detection
+- Board validation (fysiek vs engine state)
+- LED feedback (selection, legal moves, warnings)
+- Temp message systeem
+- Pause handling bij board mismatches
+- Brightness management
+
+Game-specifieke functionaliteit (moet geïmplementeerd worden door subclass):
+- Game engine (chess.Board vs checkers board)
+- GUI rendering (piece symbols, board layout)
+- AI opponent (Stockfish vs checkers AI)
+- Piece movement rules (via engine)
+
+Subclasses moeten implementeren:
+- _create_engine(): Return game-specifieke engine instance
+- _create_gui(): Return game-specifieke GUI instance
+- _create_ai(): Return AI instance (optioneel, mag None zijn)
+"""
+
+import pygame
+import time
+from abc import ABC, abstractmethod
+from lib.hardware.leds import LEDController
+from lib.hardware.sensors import SensorReader
+from lib.hardware.mapping import ChessMapper  # TODO: Hernoemen naar BoardMapper
+from lib.settings import Settings
+
+
+class BaseGame(ABC):
+    """Abstract base class voor board games met sensor integratie"""
+    
+    def __init__(self, brightness=128):
+        """
+        Initialiseer base game
+        
+        Args:
+            brightness: LED brightness value (0-255)
+        """
+        print(f"Initialiseer {self.__class__.__name__}...")
+        
+        # Hardware (shared tussen alle games)
+        self.leds = LEDController(brightness=brightness)
+        self.sensors = SensorReader()
+        
+        # Game engine (game-specifiek, wordt gemaakt door subclass)
+        self.engine = self._create_engine()
+        
+        # GUI (game-specifiek, wordt gemaakt door subclass)
+        self.gui = self._create_gui(self.engine)
+        self.screen = self.gui.screen  # Voor snelle toegang
+        
+        # AI opponent (game-specifiek, optioneel)
+        self.ai = None
+        if self.gui.settings.get('play_vs_computer', False):
+            self.ai = self._create_ai()
+        
+        # Shared state tracking
+        self.previous_sensor_state = {}
+        self.selected_square = None
+        self.invalid_return_position = None  # Touch-move violation tracking
+        self.board_mismatch_positions = []  # Board validation errors
+        self.game_paused = False  # Pause bij board mismatch
+        self.previous_brightness = brightness
+        self.temp_message = None  # Tijdelijke berichten
+        self.temp_message_timer = 0  # Wanneer bericht verdwijnt
+        self.last_blink_state = None  # Track LED blink state om onnodige updates te voorkomen
+        
+        print(f"{self.__class__.__name__} klaar!")
+    
+    @abstractmethod
+    def _create_engine(self):
+        """
+        Maak game-specifieke engine
+        
+        Returns:
+            BaseEngine subclass instance (ChessEngine, CheckersEngine, etc.)
+        """
+        pass
+    
+    @abstractmethod
+    def _create_gui(self, engine):
+        """
+        Maak game-specifieke GUI
+        
+        Args:
+            engine: Game engine instance
+            
+        Returns:
+            BaseGUI subclass instance (ChessGUI, CheckersGUI, etc.)
+        """
+        pass
+    
+    @abstractmethod
+    def _create_ai(self):
+        """
+        Maak game-specifieke AI opponent (optioneel)
+        
+        Returns:
+            AI instance of None als niet beschikbaar
+        """
+        pass
+    
+    @abstractmethod
+    def make_computer_move(self):
+        """
+        Laat computer een zet doen (game-specifiek)
+        
+        Moet geïmplementeerd worden door subclass omdat:
+        - Chess: Stockfish UCI interface
+        - Checkers: Eigen AI algoritme
+        """
+        pass
+    
+    def read_sensors(self):
+        """
+        Lees sensor state en converteer naar dict met posities
+        
+        Returns:
+            Dict met posities en sensor states (True = stuk aanwezig)
+        """
+        sensor_values = self.sensors.read_all()
+        
+        # Inverse logica: LOW = magneet aanwezig (stuk staat er)
+        active_sensors = {}
+        for i in range(64):
+            pos = ChessMapper.sensor_to_chess(i)  # TODO: Gebruik board_notation_to_sensor mapping
+            if pos:
+                # True = stuk staat op veld (sensor LOW)
+                active_sensors[pos] = not sensor_values[i]
+        
+        return active_sensors
+    
+    def validate_board_state(self, sensor_state):
+        """
+        Vergelijk fysieke board state met engine state
+        
+        Args:
+            sensor_state: Dict met posities en sensor states (True = stuk aanwezig)
+        
+        Returns:
+            List van posities waar stukken zouden moeten zijn maar ontbreken
+        """
+        mismatches = []
+        
+        # Check alle velden op het bord
+        for row in range(8):
+            for col in range(8):
+                pos = f"{chr(65 + col)}{8 - row}"
+                
+                # Wat zegt de engine?
+                engine_has_piece = self.engine.get_piece_at(pos) is not None
+                
+                # Wat zegt de sensor?
+                sensor_has_piece = sensor_state.get(pos, False)
+                
+                # Mismatch: engine denkt er staat een stuk, maar sensor detecteert niets
+                if engine_has_piece and not sensor_has_piece:
+                    mismatches.append(pos)
+        
+        return mismatches
+    
+    def detect_changes(self, current_state, previous_state):
+        """
+        Detecteer veranderingen in sensor state
+        
+        Returns:
+            (added, removed) - sets van posities
+        """
+        current_positions = set(pos for pos, active in current_state.items() if active)
+        previous_positions = set(pos for pos, active in previous_state.items() if active)
+        
+        added = current_positions - previous_positions
+        removed = previous_positions - current_positions
+        
+        return added, removed
+    
+    def handle_sensor_changes(self, added, removed):
+        """
+        Handle sensor veranderingen
+        
+        Args:
+            added: Set van posities waar stukken zijn neergezet
+            removed: Set van posities waar stukken zijn weggehaald
+        """
+        for pos in removed:
+            print(f"[SENSOR EVENT] Stuk weggehaald van {pos}")
+            self.handle_piece_removed(pos)
+        for pos in added:
+            print(f"[SENSOR EVENT] Stuk neergezet op {pos}")
+            self.handle_piece_added(pos)
+    
+    def update_leds(self, positions, color=(255, 255, 255, 0)):
+        """
+        Light LEDs op specifieke posities
+        
+        Args:
+            positions: List van positie notaties
+            color: (r, g, b, w) tuple
+        """
+        # Clear all LEDs
+        self.leds.clear()
+        
+        # Light up specified positions
+        for pos in positions:
+            sensor_num = ChessMapper.chess_to_sensor(pos)  # TODO: Gebruik board mapping
+            if sensor_num is not None:
+                r, g, b, w = color
+                self.leds.set_led(sensor_num, r, g, b, w)
+        
+        self.leds.show()
+    
+    def handle_piece_removed(self, position):
+        """
+        Handle wanneer stuk weggehaald wordt
+        
+        Args:
+            position: Positie notatie van waar stuk weggehaald is
+        """
+        print(f"\nStuk weggehaald van {position}")
+        
+        # Check of we terugkomen van een invalid return (rood knipperen -> blauw knipperen)
+        if self.invalid_return_position == position:
+            print(f"  Terug opgepakt van ongeldige return positie - terug naar normaal blauw")
+            self.invalid_return_position = None
+        
+        # Check of er een stuk staat volgens engine
+        piece = self.engine.get_piece_at(position)
+        if piece:
+            print(f"  Stuk: {piece.symbol() if hasattr(piece, 'symbol') else piece}")
+            
+            # Haal legal moves op
+            legal_moves = self.engine.get_legal_moves_from(position)
+            
+            if legal_moves:
+                print(f"  Legal moves: {', '.join(legal_moves)}")
+                
+                # Toon opgepakt stuk in GUI
+                self.gui.set_selected_piece(piece, position)
+                
+                # Highlight legal move posities
+                self.gui.highlight_squares(legal_moves)
+                
+                # Light up LEDs voor legal moves (blauw)
+                self.update_leds(legal_moves, color=(0, 0, 255, 0))
+                
+                # Onthoud geselecteerd veld
+                self.selected_square = position
+            else:
+                print("  Geen legal moves - stuk kan niet geselecteerd worden!")
+                self.show_temp_message("No legal moves for this piece!", duration=2000)
+        else:
+            print("  Geen stuk op deze positie volgens engine")
+    
+    def handle_piece_added(self, position):
+        """
+        Handle wanneer stuk toegevoegd wordt
+        
+        Args:
+            position: Positie notatie waar stuk neergezet is
+        """
+        print(f"\nStuk neergezet op {position}")
+        
+        if self.selected_square:
+            # Check of stuk teruggeplaatst wordt op originele positie
+            if position == self.selected_square:
+                # Check strict touch-move setting
+                strict_touch_move = self.gui.settings.get('strict_touch_move', False)
+                
+                if strict_touch_move:
+                    print(f"  Strict touch-move: stuk teruggeplaatst - ROOD knipperen!")
+                    
+                    # Track invalid return position
+                    self.invalid_return_position = position
+                    
+                    # Show warning message
+                    self.show_temp_message("Cannot return piece - Touch-move rule!", duration=2000)
+                    return
+                else:
+                    print(f"  Stuk teruggeplaatst op originele positie - deselecteer")
+                    
+                    # Clear highlights en LEDs
+                    self.gui.highlight_squares([])
+                    self.gui.set_selected_piece(None, None)
+                    self.leds.clear()
+                    self.leds.show()
+                    
+                    # Reset selectie
+                    self.selected_square = None
+                    return
+            
+            # Probeer zet te maken
+            if self.engine.make_move(self.selected_square, position):
+                print(f"  Zet: {self.selected_square} -> {position}")
+                
+                # Clear highlights en LEDs
+                self.gui.highlight_squares([])
+                self.gui.set_selected_piece(None, None)
+                self.leds.clear()
+                self.leds.show()
+                
+                # Reset selectie
+                self.selected_square = None
+                
+                # Check game status
+                if self.engine.is_game_over():
+                    print(f"\n*** {self.engine.get_game_result()} ***\n")
+                else:
+                    # Als VS Computer aan staat, laat computer zet doen
+                    if self.gui.settings.get('play_vs_computer', False) and self.ai:
+                        # Eerst GUI hertekenen met player move
+                        self.screen.fill(self.gui.COLOR_BG)
+                        self.gui.draw_board()
+                        self.gui.draw_pieces()
+                        self.gui.draw_debug_overlays()
+                        if self.gui.settings.get('show_coordinates', True):
+                            self.gui.draw_coordinates()
+                        self.gui.draw_sidebar()
+                        pygame.display.flip()
+                        
+                        # Nu computer zet doen
+                        self.make_computer_move()
+            else:
+                print(f"  Ongeldige zet: {self.selected_square} -> {position}")
+    
+    def show_temp_message(self, message, duration=2000):
+        """Toon tijdelijk bericht op scherm"""
+        self.temp_message = message
+        self.temp_message_timer = pygame.time.get_ticks() + duration
+    
+    def run(self):
+        """
+        Main game loop (shared tussen alle games)
+        
+        Deze methode bevat ALLE gemeenschappelijke game loop logic.
+        Game-specifieke rendering wordt gedelegeerd naar GUI classes.
+        """
+        print("\n" + "=" * 50)
+        print(f"{self.__class__.__name__} Started")
+        print("=" * 50)
+        print("Druk op ESC of sluit venster om te stoppen\n")
+        
+        clock = pygame.time.Clock()
+        running = True
+        
+        # Initiële sensor state
+        current_sensors = self.read_sensors()
+        self.previous_sensor_state = current_sensors.copy()
+        
+        try:
+            while running:
+                # Update brightness indien gewijzigd
+                current_brightness = self.gui.settings.get('brightness', 20)
+                if current_brightness != self.previous_brightness:
+                    self.leds.set_brightness(current_brightness)
+                    self.previous_brightness = current_brightness
+                    print(f"Brightness aangepast naar {current_brightness}%")
+                
+                # Update AI status indien gewijzigd (game-specifiek)
+                self._update_ai_status()
+                
+                # Update LED blink animatie
+                self._update_led_animations()
+                
+                # Lees sensors
+                current_sensors = self.read_sensors()
+                
+                # Valideer board state
+                self._validate_board_if_enabled(current_sensors)
+                
+                # Update sensor debug visualisatie
+                if self.gui.settings.get('debug_sensors', False):
+                    self.gui.update_sensor_debug_states(current_sensors)
+                
+                # Clear temp message als timer verlopen is
+                if self.temp_message and pygame.time.get_ticks() >= self.temp_message_timer:
+                    self.temp_message = None
+                
+                # Draw GUI
+                gui_result = self.gui.draw(self.temp_message, self.temp_message_timer)
+                
+                # Handle events
+                running = self._handle_events(gui_result)
+                
+                # Detecteer sensor veranderingen (alleen als niet gepauzeerd)
+                if not self.game_paused:
+                    added, removed = self.detect_changes(current_sensors, self.previous_sensor_state)
+                    if added or removed:
+                        self.handle_sensor_changes(added, removed)
+                
+                # Update previous state
+                self.previous_sensor_state = current_sensors.copy()
+                
+                # Control framerate
+                clock.tick(30)  # 30 FPS
+                
+        except KeyboardInterrupt:
+            print("\n\nGame gestopt")
+        finally:
+            self.cleanup()
+    
+    def _update_ai_status(self):
+        """Update AI opponent status (game-specifiek, kan overridden worden)"""
+        pass  # Default implementatie: geen AI updates
+    
+    def _update_led_animations(self):
+        """Update LED blink animaties voor geselecteerd veld en warnings"""
+        if self.selected_square:
+            # Bereken knipperstaat (500ms aan, 500ms uit)
+            blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
+            
+            # Alleen updaten als blink state veranderd is (voorkom flikkering)
+            if blink_on == self.last_blink_state:
+                return
+            
+            self.last_blink_state = blink_on
+            
+            # Bereken legal moves 1x (voorkom herberekening die flikkering veroorzaakt)
+            sensor_num = ChessMapper.chess_to_sensor(self.selected_square)
+            legal_moves = self.engine.get_legal_moves_from(self.selected_square)
+            
+            # Check invalid return state (strict touch-move violation)
+            if self.invalid_return_position:
+                # ROOD knipperen voor originele positie, groen voor legal moves
+                if blink_on:
+                    if sensor_num is not None:
+                        self.leds.clear()
+                        self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD
+                        for pos in legal_moves:
+                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            if move_sensor is not None:
+                                self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
+                        self.leds.show()
+                else:
+                    # Alleen legal moves (groen)
+                    self.leds.clear()
+                    for pos in legal_moves:
+                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        if move_sensor is not None:
+                            self.leds.set_led(move_sensor, 0, 255, 0, 0)
+                    self.leds.show()
+            else:
+                # Normaal blauw/groen knipperen
+                if blink_on:
+                    if sensor_num is not None:
+                        self.leds.clear()
+                        self.leds.set_led(sensor_num, 0, 0, 255, 0)  # BLAUW
+                        for pos in legal_moves:
+                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            if move_sensor is not None:
+                                self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
+                        self.leds.show()
+                else:
+                    # Alleen legal moves
+                    self.leds.clear()
+                    for pos in legal_moves:
+                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        if move_sensor is not None:
+                            self.leds.set_led(move_sensor, 0, 255, 0, 0)
+                    self.leds.show()
+        else:
+            # Reset blink state als er geen selectie is
+            self.last_blink_state = None
+    
+    def _validate_board_if_enabled(self, current_sensors):
+        """Valideer board state als validatie enabled is"""
+        if self.gui.settings.get('validate_board_state', True):
+            if not self.selected_square:
+                self.board_mismatch_positions = self.validate_board_state(current_sensors)
+                
+                if self.board_mismatch_positions:
+                    # Game paused: laat missende stukken rood knipperen
+                    self.game_paused = True
+                    blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
+                    
+                    if blink_on:
+                        self.leds.clear()
+                        for pos in self.board_mismatch_positions:
+                            sensor_num = ChessMapper.chess_to_sensor(pos)
+                            if sensor_num is not None:
+                                self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD
+                        self.leds.show()
+                    else:
+                        self.leds.clear()
+                        self.leds.show()
+                    
+                    # Toon warning message
+                    if not self.temp_message:
+                        self.show_temp_message("Board mismatch!", duration=999999)
+                else:
+                    # Board OK
+                    if self.game_paused:
+                        self.game_paused = False
+                        self.temp_message = None
+        else:
+            # Validatie uitgeschakeld - reset state
+            if self.game_paused or self.board_mismatch_positions:
+                self.game_paused = False
+                self.board_mismatch_positions = []
+                self.temp_message = None
+    
+    def _handle_events(self, gui_result):
+        """
+        Handle pygame events
+        
+        Returns:
+            Boolean - True om door te gaan, False om te stoppen
+        """
+        # Unpack GUI result
+        ok_button = gui_result.get('ok_button')
+        tabs = gui_result.get('tabs', {})
+        sliders = gui_result.get('sliders', {})
+        toggles = gui_result.get('toggles', {})
+        exit_yes_button = gui_result.get('exit_yes')
+        exit_no_button = gui_result.get('exit_no')
+        new_game_yes_button = gui_result.get('new_game_yes')
+        new_game_no_button = gui_result.get('new_game_no')
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if self.gui.show_settings:
+                        self.gui.show_settings = False
+                        self.gui.temp_settings = {}
+                    else:
+                        return False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    if not self._handle_mouse_click(event.pos, gui_result):
+                        return False  # Exit game
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.gui.events.stop_slider_drag()
+            elif event.type == pygame.MOUSEMOTION:
+                self.gui.events.handle_slider_drag(event.pos, sliders)
+        
+        return True
+    
+    def _handle_mouse_click(self, pos, gui_result):
+        """
+        Handle mouse click (dialog en board clicks)
+        
+        Returns:
+            Boolean - True om door te gaan, False om te stoppen
+        """
+        # Unpack GUI components
+        ok_button = gui_result.get('ok_button')
+        tabs = gui_result.get('tabs', {})
+        sliders = gui_result.get('sliders', {})
+        toggles = gui_result.get('toggles', {})
+        exit_yes_button = gui_result.get('exit_yes')
+        exit_no_button = gui_result.get('exit_no')
+        new_game_yes_button = gui_result.get('new_game_yes')
+        new_game_no_button = gui_result.get('new_game_no')
+        
+        # Exit confirmation dialog
+        if self.gui.show_exit_confirm:
+            if self.gui.handle_exit_yes_click(pos, exit_yes_button):
+                print("\nExiting game...")
+                return False
+            elif self.gui.handle_exit_no_click(pos, exit_no_button):
+                pass
+        
+        # New game confirmation dialog
+        elif self.gui.show_new_game_confirm:
+            if self.gui.handle_new_game_yes_click(pos, new_game_yes_button):
+                print("\nStarting new game...")
+                self.engine.reset()
+                self.gui.show_new_game_confirm = False
+                self._clear_selection()
+            elif self.gui.handle_new_game_no_click(pos, new_game_no_button):
+                pass
+        
+        # Settings dialog
+        elif self.gui.show_settings:
+            self._handle_settings_click(pos, gui_result)
+        
+        # Game board clicks
+        else:
+            self._handle_game_click(pos)
+        
+        return True
+    
+    def _handle_settings_click(self, pos, gui_result):
+        """Handle clicks in settings dialog"""
+        tabs = gui_result.get('tabs', {})
+        sliders = gui_result.get('sliders', {})
+        toggles = gui_result.get('toggles', {})
+        ok_button = gui_result.get('ok_button')
+        
+        # Tab clicks
+        if self.gui.events.handle_tab_click(pos, tabs):
+            return
+        
+        # Toggle clicks
+        if self.gui.events.handle_toggle_click(pos, toggles.get('coordinates')):
+            return
+        if self.gui.events.handle_vs_computer_toggle_click(pos, toggles.get('vs_computer')):
+            return
+        if self.gui.events.handle_strict_touch_move_toggle_click(pos, toggles.get('strict_touch_move')):
+            return
+        if self.gui.events.handle_validate_board_state_toggle_click(pos, toggles.get('validate_board_state')):
+            return
+        if self.gui.events.handle_debug_toggle_click(pos, toggles.get('debug_sensors')):
+            return
+        
+        # Power profile dropdown
+        if self.gui.show_power_dropdown and self.gui.events.handle_power_profile_item_click(
+            pos, gui_result.get('dropdown_items', [])):
+            return
+        if self.gui.events.handle_power_profile_dropdown_click(
+            pos, gui_result.get('dropdowns', {}).get('power_profile')):
+            return
+        
+        # Slider clicks
+        if self.gui.events.handle_brightness_slider_click(pos, sliders.get('brightness')):
+            return
+        if self.gui.events.handle_skill_slider_click(pos, sliders.get('skill')):
+            return
+        if self.gui.events.handle_think_time_slider_click(pos, sliders.get('think_time')):
+            return
+        if self.gui.events.handle_depth_slider_click(pos, sliders.get('depth')):
+            return
+        if self.gui.events.handle_threads_slider_click(pos, sliders.get('threads')):
+            return
+        
+        # OK button
+        if self.gui.handle_ok_click(pos, ok_button):
+            return
+    
+    def _handle_game_click(self, pos):
+        """Handle clicks on game board"""
+        # New game button
+        if self.gui.handle_new_game_click(pos):
+            self._clear_selection()
+            return
+        
+        # Exit button
+        if self.gui.handle_exit_click(pos):
+            self._clear_selection()
+            return
+        
+        # Settings button
+        if self.gui.handle_settings_click(pos):
+            self._clear_selection()
+            self.temp_message = None
+            return
+        
+        # Board click
+        clicked_square = self.gui.get_square_from_pos(pos)
+        if clicked_square:
+            if self.selected_square:
+                # Klik op hetzelfde veld?
+                if clicked_square == self.selected_square:
+                    strict_touch_move = self.gui.settings.get('strict_touch_move', False)
+                    if strict_touch_move:
+                        print(f"\nStrict touch-move: mag niet deselecteren door te klikken!")
+                        self.show_temp_message("Cannot deselect - Touch-move rule!", duration=2000)
+                    else:
+                        print(f"\nDeselecteer {clicked_square}")
+                        self._clear_selection()
+                else:
+                    # Probeer zet naar nieuw veld
+                    self.handle_piece_added(clicked_square)
+            else:
+                # Selecteer stuk
+                piece = self.engine.get_piece_at(clicked_square)
+                if piece:
+                    self.handle_piece_removed(clicked_square)
+    
+    def _clear_selection(self):
+        """Clear piece selection en LEDs"""
+        if self.selected_square:
+            self.gui.highlight_squares([])
+            self.gui.set_selected_piece(None, None)
+            self.selected_square = None
+            self.leds.clear()
+            self.leds.show()
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        if self.ai:
+            if hasattr(self.ai, 'cleanup'):
+                self.ai.cleanup()
+        self.leds.cleanup()
+        self.sensors.cleanup()
+        self.gui.quit()
+        print(f"{self.__class__.__name__} afgesloten")
