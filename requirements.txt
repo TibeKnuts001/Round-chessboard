@@ -3,5 +3,5 @@ spidev
 gpiozero
 RPi.GPIO
 python-chess
-pydraughts
+py-draughts
 pygame

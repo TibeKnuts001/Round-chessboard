@@ -2,7 +2,7 @@
 """
 Checkers Engine Integration
 
-Deze module beheert de damlogica via de pydraughts library.
+Deze module beheert de damlogica via de py-draughts library.
 Gebruikt Amerikaanse/Engelse dammen regels op 8x8 bord.
 
 Functionaliteit:
@@ -13,19 +13,19 @@ Functionaliteit:
 - Game state detection (win/loss/draw)
 
 Hoofdklasse:
-- CheckersEngine: Wrapper rond pydraughts.Board met helper methods
+- CheckersEngine: Wrapper rond py-draughts AmericanBoard met helper methods
 
 Notatie:
 - Velden zijn genummerd 1-32 (alleen de donkere vakken)
 - Chess notatie mapping: A1-H8 -> 1-32 numbering
 """
 
-from draughts import Board
+from draughts import AmericanBoard
 from lib.core.base_engine import BaseEngine
 
 
 class CheckersEngine(BaseEngine):
-    """Wrapper voor pydraughts engine - Amerikaanse dammen (8x8)"""
+    """Wrapper voor py-draughts engine - Amerikaanse dammen (8x8)"""
     
     # Mapping van chess notatie (A1-H8) naar checkers square numbers (1-32)
     # Alleen donkere vakken worden gebruikt in dammen
@@ -53,14 +53,16 @@ class CheckersEngine(BaseEngine):
     def __init__(self):
         """Initialiseer nieuw damspel in startpositie"""
         # Amerikaanse dammen (8x8, ook bekend als "English draughts")
-        # Gebruik variant="english" voor 8x8 board met 32 vakken (nummering 1-32)
-        self.board = Board(variant="english")
+        # AmericanBoard is het 8x8 variant van py-draughts
+        self.board = AmericanBoard()
         self.selected_square = None
+        self.move_count = 0  # Track aantal halve zetten
     
     def reset(self):
         """Reset bord naar startpositie"""
-        self.board = Board(variant="english")
+        self.board = AmericanBoard()
         self.selected_square = None
+        self.move_count = 0
     
     def get_piece_at(self, chess_notation):
         """
@@ -78,32 +80,45 @@ class CheckersEngine(BaseEngine):
             return None  # Licht vakje, geen stuk mogelijk
         
         # Check of er een stuk staat via FEN
+        # py-draughts format: [FEN "W:W:W21,22,...:B1,2,..."]
         position = self.board.fen
+        
+        # Strip [FEN "..."] wrapper
+        if position.startswith('[FEN "') and position.endswith('"]'):
+            position = position[6:-2]  # Remove [FEN " and "]
+        
         parts = position.split(':')
         
-        # In pydraughts FEN: W = eerste speler (bovenaan = black), B = tweede speler (onderaan = white)
+        # py-draughts FEN format: W:W:W21,22,...:B1,2,...
+        # parts[0] = turn (W or B)
+        # parts[1] = "W" marker for white pieces section
+        # parts[2] = white pieces (W21,22,... or WK1,K2,... for kings)
+        # parts[3] = black pieces (B1,2,... or BK1,K2,... for kings)
+        
         first_player_pieces = []   # Bovenaan (black in ons spel)
         second_player_pieces = []  # Onderaan (white in ons spel)
         first_player_kings = []
         second_player_kings = []
         
-        for part in parts:
-            if part.startswith('W'):
-                pieces_str = part[1:]
-                if pieces_str:
-                    for p in pieces_str.split(','):
-                        if p.startswith('K'):
-                            first_player_kings.append(int(p[1:]))
-                        else:
-                            first_player_pieces.append(int(p))
-            elif part.startswith('B'):
-                pieces_str = part[1:]
-                if pieces_str:
-                    for p in pieces_str.split(','):
-                        if p.startswith('K'):
-                            second_player_kings.append(int(p[1:]))
-                        else:
-                            second_player_pieces.append(int(p))
+        # Parse white pieces (parts[2] starts with W)
+        if len(parts) > 2 and parts[2].startswith('W'):
+            pieces_str = parts[2][1:]  # Remove 'W' prefix
+            if pieces_str:
+                for p in pieces_str.split(','):
+                    if p.startswith('K'):
+                        second_player_kings.append(int(p[1:]))
+                    else:
+                        second_player_pieces.append(int(p))
+        
+        # Parse black pieces (parts[3] starts with B)
+        if len(parts) > 3 and parts[3].startswith('B'):
+            pieces_str = parts[3][1:]  # Remove 'B' prefix
+            if pieces_str:
+                for p in pieces_str.split(','):
+                    if p.startswith('K'):
+                        first_player_kings.append(int(p[1:]))
+                    else:
+                        first_player_pieces.append(int(p))
         
         # Check of ons square een stuk heeft
         from types import SimpleNamespace
@@ -129,33 +144,38 @@ class CheckersEngine(BaseEngine):
             chess_notation: String zoals 'e3', 'a1', etc.
             
         Returns:
-            List van chess notaties waar naartoe gezet kan worden (UPPERCASE zoals chess)
+            Dict met 'destinations' (eindposities) en 'intermediate' (tussenposities bij multi-captures)
+            Bijvoorbeeld: {'destinations': ['A5'], 'intermediate': ['B4', 'C3']} voor multi-capture
+            Of: {'destinations': ['A5', 'B4'], 'intermediate': []} voor normale zetten
         """
         square_num = self.CHESS_TO_CHECKERS.get(chess_notation.upper())
         if square_num is None:
-            return []
+            return {'destinations': [], 'intermediate': []}
         
-        legal_destinations = []
+        destinations = []
+        intermediate = []
         
-        for move in self.board.legal_moves():
-            move_str = move.pdn_move
-            
-            # Parse move (format: "square1-square2" of "square1xsquare2xsquare3")
-            if 'x' in move_str:
-                squares = move_str.split('x')
-            else:
-                squares = move_str.split('-')
-            
-            from_square = int(squares[0])
-            
-            if from_square == square_num:
-                to_square = int(squares[-1])
-                to_chess = self.CHECKERS_TO_CHESS.get(to_square)
-                if to_chess and to_chess not in legal_destinations:
-                    # Return UPPERCASE zoals chess doet (voor LED mapping)
-                    legal_destinations.append(to_chess)
+        for move in self.board.legal_moves:
+            # py-draughts Move heeft square_list attribuut met alle posities
+            # bijv. bij 11x18x27 is square_list [10, 17, 26] (0-indexed)
+            if hasattr(move, 'square_list') and len(move.square_list) > 0:
+                from_square = move.square_list[0] + 1  # +1 omdat square_list 0-indexed is
+                
+                if from_square == square_num:
+                    # Laatste positie is de eindbestemming
+                    final_sq = move.square_list[-1] + 1
+                    final_chess = self.CHECKERS_TO_CHESS.get(final_sq)
+                    if final_chess and final_chess not in destinations:
+                        destinations.append(final_chess)
+                    
+                    # Tussenposities (alleen bij multi-captures)
+                    if len(move.square_list) > 2:  # Meer dan from + to = multi-capture
+                        for sq in move.square_list[1:-1]:  # Skip eerste (from) en laatste (to)
+                            inter_chess = self.CHECKERS_TO_CHESS.get(sq + 1)
+                            if inter_chess and inter_chess not in intermediate:
+                                intermediate.append(inter_chess)
         
-        return legal_destinations
+        return {'destinations': destinations, 'intermediate': intermediate}
     
     def make_move(self, from_pos, to_pos):
         """
@@ -174,8 +194,8 @@ class CheckersEngine(BaseEngine):
         if from_square is None or to_square is None:
             return False
         
-        for move in self.board.legal_moves():
-            move_str = move.pdn_move
+        for move in self.board.legal_moves:
+            move_str = str(move)
             
             if 'x' in move_str:
                 squares = move_str.split('x')
@@ -187,20 +207,21 @@ class CheckersEngine(BaseEngine):
             
             if move_from == from_square and move_to == to_square:
                 self.board.push(move)
+                self.move_count += 1  # Track move count
                 return True
         
         return False
     
     def is_game_over(self):
         """Check of spel afgelopen is"""
-        return self.board.is_over()
+        return self.board.game_over
     
     def get_game_result(self):
         """Geef resultaat van spel"""
-        if not self.board.is_over():
+        if not self.board.game_over:
             return "Game in progress"
         
-        result = self.board.result()
+        result = self.board.result
         if result == "1-0":
             return "White wins!"
         elif result == "0-1":
@@ -210,13 +231,13 @@ class CheckersEngine(BaseEngine):
     
     def whose_turn(self):
         """Geef wiens beurt het is"""
-        # pydraughts: board.turn convention check
+        # py-draughts: board.turn convention check
         return "white" if self.board.turn else "black"
     
     def get_move_number(self):
         """Geef huidige move number"""
-        # pydraughts board heeft move_stack voor gespeelde zetten
-        return len(self.board.move_stack) // 2 + 1
+        # Track move number via eigen counter (move_count = halve zetten)
+        return self.move_count // 2 + 1
     
     def is_in_check(self):
         """Check of huidige speler schaak staat (niet van toepassing bij dammen)"""
@@ -240,20 +261,28 @@ class CheckersEngine(BaseEngine):
         # Voor checkers: tel hoeveel stukken ontbreken t.o.v. start positie
         # Start: 12 stukken per kleur
         position = self.board.fen
+        
+        # Strip [FEN "..."] wrapper
+        if position.startswith('[FEN "') and position.endswith('"]'):
+            position = position[6:-2]
+        
         parts = position.split(':')
         
         white_count = 0
         black_count = 0
         
-        for part in parts:
-            if part.startswith('W'):
-                pieces_str = part[1:]
-                if pieces_str:
-                    white_count = len(pieces_str.split(','))
-            elif part.startswith('B'):
-                pieces_str = part[1:]
-                if pieces_str:
-                    black_count = len(pieces_str.split(','))
+        # py-draughts format: W:W:W21,22,...:B1,2,...
+        # parts[2] = white pieces (W21,22,...)
+        # parts[3] = black pieces (B1,2,...)
+        if len(parts) > 2 and parts[2].startswith('W'):
+            pieces_str = parts[2][1:]  # Remove 'W' prefix
+            if pieces_str:
+                white_count = len(pieces_str.split(','))
+        
+        if len(parts) > 3 and parts[3].startswith('B'):
+            pieces_str = parts[3][1:]  # Remove 'B' prefix
+            if pieces_str:
+                black_count = len(pieces_str.split(','))
         
         # Geslagen stukken = 12 - huidige aantal
         white_captured = 12 - black_count  # Wit heeft zwart geslagen
@@ -273,11 +302,9 @@ class CheckersEngine(BaseEngine):
         Returns:
             String zoals '12-16' of None als geen zetten gedaan
         """
-        if not self.board.move_stack:
-            return None
-        
-        last_move = self.board.move_stack[-1]
-        return last_move.pdn_move
+        # py-draughts AmericanBoard heeft geen move_stack
+        # We kunnen de laatste zet niet ophalen zonder zelf te tracken
+        return None
     
     def get_fen(self):
         """Geef FEN string van huidige positie"""

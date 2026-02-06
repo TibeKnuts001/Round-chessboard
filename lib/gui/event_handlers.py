@@ -67,8 +67,17 @@ class EventHandlers:
         if ok_button and ok_button.collidepoint(pos):
             # Sla alle tijdelijke settings permanent op
             if self.gui.temp_settings:
-                for key, value in self.gui.temp_settings.items():
-                    self.gui.settings.settings[key] = value
+                # Update settings met temp values (merge nested dicts)
+                for section, section_data in self.gui.temp_settings.items():
+                    if isinstance(section_data, dict):
+                        # Update sectie (hardware, debug, chess, checkers)
+                        if section not in self.gui.settings.settings:
+                            self.gui.settings.settings[section] = {}
+                        self.gui.settings.settings[section].update(section_data)
+                    else:
+                        # Backward compatibility: directe key
+                        self.gui.settings.settings[section] = section_data
+                
                 self.gui.settings.save()
                 self.gui.temp_settings = {}
             
@@ -151,6 +160,28 @@ class EventHandlers:
             return True
         return False
     
+    # Checkers-specific toggle handlers
+    
+    def handle_vs_computer_checkers_toggle_click(self, pos, toggle_rect):
+        """Handle klik op VS Computer toggle switch (checkers)"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'play_vs_computer', False, section='checkers')
+            Settings.set_in_dict(self.gui.temp_settings, 'play_vs_computer', not current_value, section='checkers')
+            return True
+        return False
+    
+    def handle_strict_touch_move_checkers_toggle_click(self, pos, toggle_rect):
+        """Handle klik op strict touch-move toggle switch (checkers)"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'strict_touch_move', False, section='checkers')
+            Settings.set_in_dict(self.gui.temp_settings, 'strict_touch_move', not current_value, section='checkers')
+            return True
+        return False
+    
     # Slider handlers
     
     def handle_slider_drag(self, pos, sliders_dict):
@@ -173,6 +204,8 @@ class EventHandlers:
             'think_time': ('stockfish_think_time', 500, 5000),
             'depth': ('stockfish_depth', 5, 25),
             'threads': ('stockfish_threads', 1, 4),
+            'ai_difficulty': ('ai_difficulty', 1, 10),
+            'ai_think_time': ('ai_think_time', 500, 5000),
         }
         
         slider_type = self.gui.dragging_slider

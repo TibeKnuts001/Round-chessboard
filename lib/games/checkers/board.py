@@ -53,11 +53,20 @@ class CheckersBoardRenderer(BaseBoardRenderer):
         Teken checkers bord met highlighted squares
         
         Args:
-            highlighted_squares: List van square notaties om te highlighten (accepts both upper/lowercase)
+            highlighted_squares: Dict met 'destinations' (groen) en 'intermediate' (geel) keys
+                               Of list voor backwards compatibility
         """
-        highlighted_squares = highlighted_squares or []
-        # Convert to lowercase for comparison
-        highlighted_squares_lower = [sq.lower() for sq in highlighted_squares]
+        # Parse input
+        if isinstance(highlighted_squares, dict):
+            destinations = [sq.lower() for sq in highlighted_squares.get('destinations', [])]
+            intermediate = [sq.lower() for sq in highlighted_squares.get('intermediate', [])]
+        else:
+            # Backwards compatible
+            destinations = [sq.lower() for sq in (highlighted_squares or [])]
+            intermediate = []
+        
+        # Kleuren voor highlights
+        COLOR_INTERMEDIATE = (255, 255, 0)  # Geel voor tussenposities
         
         for row in range(8):
             for col in range(8):
@@ -69,7 +78,10 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 
                 square_notation = self._get_square_notation(row, col)
                 
-                if square_notation in highlighted_squares_lower:
+                # Kies kleur: geel voor intermediate, groen voor destinations, anders normaal
+                if square_notation in intermediate:
+                    color = COLOR_INTERMEDIATE
+                elif square_notation in destinations:
                     color = self.COLOR_HIGHLIGHT
                 else:
                     color = self.COLOR_DARK_SQUARE if is_dark else self.COLOR_LIGHT_SQUARE
@@ -146,4 +158,16 @@ class CheckersBoardRenderer(BaseBoardRenderer):
         
         # Converteer naar chess notatie (lowercase)
         return f"{chr(97 + col)}{8 - row}"
+    
+    def draw_debug_overlays(self, active_sensor_states):
+        """
+        Override om sensor states met UPPERCASE keys te converteren naar lowercase
+        
+        Args:
+            active_sensor_states: Dict met UPPERCASE square notaties (van ChessMapper)
+        """
+        # Converteer keys naar lowercase voor checkers
+        lowercase_states = {key.lower(): value for key, value in active_sensor_states.items()}
+        # Roep parent method aan met lowercase keys
+        super().draw_debug_overlays(lowercase_states)
 

@@ -31,6 +31,7 @@ from lib.gui.dialogs import DialogRenderer
 from lib.gui.settings_dialog import SettingsDialog
 from lib.games.checkers.board import CheckersBoardRenderer
 from lib.games.checkers.sidebar import CheckersSidebarRenderer
+from lib.games.checkers.settings_dialog import CheckersSettingsTabs
 from lib.gui.event_handlers import EventHandlers
 
 
@@ -116,7 +117,7 @@ class CheckersGUI:
         self.show_exit_confirm = False
         self.show_new_game_confirm = False
         self.show_power_dropdown = False
-        self.highlighted_squares = []
+        self.highlighted_squares = {'destinations': [], 'intermediate': []}
         self.selected_piece = None
         self.selected_piece_from = None
         self.active_settings_tab = 'general'
@@ -167,9 +168,17 @@ class CheckersGUI:
     def draw_board(self):
         """Teken checkers bord"""
         # Voeg selected square toe aan highlights voor gouden outline
-        highlights = self.highlighted_squares.copy()
-        if self.selected_piece_from:
-            highlights.append(self.selected_piece_from)
+        if isinstance(self.highlighted_squares, dict):
+            highlights = self.highlighted_squares.copy()
+            if self.selected_piece_from:
+                # Voeg selected square toe aan destinations
+                if self.selected_piece_from not in highlights['destinations']:
+                    highlights['destinations'] = highlights['destinations'] + [self.selected_piece_from]
+        else:
+            # Fallback voor backwards compatibility
+            highlights = self.highlighted_squares.copy()
+            if self.selected_piece_from:
+                highlights.append(self.selected_piece_from)
         
         self.board_renderer.draw_board(highlighted_squares=highlights)
     
@@ -208,10 +217,32 @@ class CheckersGUI:
         )
     
     def draw_settings_dialog(self):
-        """Teken settings dialog"""
+        """Teken settings dialog met checkers-specifieke tabs (Gameplay + AI)"""
+        # Gebruik temp_settings als die bestaat, anders echte settings
+        active_settings = self.temp_settings if self.temp_settings else self.settings.settings
+        
+        # Checkers-specifieke tabs (AI tab enabled als vs_computer aan staat)
+        vs_computer = active_settings.get('checkers', {}).get('play_vs_computer', False)
+        custom_tabs = [
+            ('gameplay_checkers', 'Gameplay', True),
+            ('ai_checkers', 'AI', vs_computer)  # Grayed out als vs_computer uit staat
+        ]
+        
+        # Checkers-specifieke renderers (wrapper lambdas om screen + font_small door te geven)
+        custom_renderers = {
+            'gameplay_checkers': lambda dx, cy, s, r: CheckersSettingsTabs.render_gameplay_tab(
+                self.screen, self.font_small, dx, cy, s, r
+            ),
+            'ai_checkers': lambda dx, cy, s, r: CheckersSettingsTabs.render_ai_tab(
+                self.screen, self.font_small, dx, cy, s, r
+            )
+        }
+        
         return self.settings_dialog.draw(
-            self.temp_settings if self.temp_settings else self.settings.settings,
-            self.active_settings_tab
+            active_settings,
+            self.active_settings_tab,
+            custom_tabs=custom_tabs,
+            custom_renderers=custom_renderers
         )
     
     def draw(self, temp_message=None, temp_message_timer=0):
@@ -276,8 +307,12 @@ class CheckersGUI:
         return result
     
     def highlight_squares(self, squares):
-        """Set highlighted squares"""
-        self.highlighted_squares = squares
+        """Set highlighted squares (dict met 'destinations' en 'intermediate' keys of list)"""
+        if isinstance(squares, dict):
+            self.highlighted_squares = squares
+        else:
+            # Backwards compatible: list wordt destinations
+            self.highlighted_squares = {'destinations': squares if isinstance(squares, list) else [], 'intermediate': []}
     
     def set_selected_piece(self, piece, from_square):
         """Set selected piece"""
@@ -317,14 +352,7 @@ class CheckersGUI:
     
     def handle_ok_click(self, pos, ok_button):
         """Handle klik op OK in settings"""
-        if ok_button and ok_button.collidepoint(pos):
-            # Apply temp settings
-            for key, value in self.temp_settings.items():
-                self.settings.set(key, value)
-            self.settings.save()
-            self.show_settings = False
-            return True
-        return False
+        return self.events.handle_ok_click(pos, ok_button)
     
     def handle_exit_yes_click(self, pos, button):
         """Handle klik op Yes in exit confirmation"""

@@ -60,7 +60,7 @@ class BaseGame(ABC):
         
         # AI opponent (game-specifiek, optioneel)
         self.ai = None
-        if self.gui.settings.get('play_vs_computer', False):
+        if self._is_vs_computer_enabled():
             self.ai = self._create_ai()
         
         # Shared state tracking
@@ -119,6 +119,16 @@ class BaseGame(ABC):
         - Checkers: Eigen AI algoritme
         """
         pass
+    
+    def _is_vs_computer_enabled(self):
+        """
+        Check of VS Computer mode aan staat (kan worden overschreven door subclass)
+        
+        Returns:
+            bool: True als VS Computer mode enabled is
+        """
+        # Default implementatie - subclass kan overschrijven voor game-specifieke sectie
+        return self.gui.settings.get('play_vs_computer', False)
     
     def read_sensors(self):
         """
@@ -240,13 +250,23 @@ class BaseGame(ABC):
             # Haal legal moves op
             legal_moves = self.engine.get_legal_moves_from(position)
             
-            if legal_moves:
-                print(f"  Legal moves: {', '.join(legal_moves)}")
+            # Parse legal_moves (kan list of dict zijn voor checkers)
+            if isinstance(legal_moves, dict):
+                destinations = legal_moves.get('destinations', [])
+                intermediate = legal_moves.get('intermediate', [])
+                all_moves = destinations + intermediate
+                has_moves = bool(destinations)  # Alleen destinations tellen
+            else:
+                all_moves = legal_moves
+                has_moves = bool(legal_moves)
+            
+            if has_moves:
+                print(f"  Legal moves: {', '.join(all_moves)}")
                 
                 # Toon opgepakt stuk in GUI
                 self.gui.set_selected_piece(piece, position)
                 
-                # Highlight legal move posities
+                # Highlight legal move posities (geef originele legal_moves door)
                 self.gui.highlight_squares(legal_moves)
                 
                 # Light up LEDs voor legal moves (blauw)
@@ -315,7 +335,7 @@ class BaseGame(ABC):
                     print(f"\n*** {self.engine.get_game_result()} ***\n")
                 else:
                     # Als VS Computer aan staat, laat computer zet doen
-                    if self.gui.settings.get('play_vs_computer', False) and self.ai:
+                    if self._is_vs_computer_enabled() and self.ai:
                         # Eerst GUI hertekenen met player move
                         self.screen.fill(self.gui.COLOR_BG)
                         self.gui.draw_board()
@@ -427,6 +447,14 @@ class BaseGame(ABC):
             sensor_num = ChessMapper.chess_to_sensor(self.selected_square)
             legal_moves = self.engine.get_legal_moves_from(self.selected_square)
             
+            # Parse legal_moves (kan list of dict zijn voor checkers multi-captures)
+            if isinstance(legal_moves, dict):
+                destinations = legal_moves.get('destinations', [])
+                intermediate = legal_moves.get('intermediate', [])
+            else:
+                destinations = legal_moves
+                intermediate = []
+            
             # Check invalid return state (strict touch-move violation)
             if self.invalid_return_position:
                 # ROOD knipperen voor originele positie, groen voor legal moves
@@ -434,37 +462,57 @@ class BaseGame(ABC):
                     if sensor_num is not None:
                         self.leds.clear()
                         self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD
-                        for pos in legal_moves:
+                        # Groen voor destinations
+                        for pos in destinations:
                             move_sensor = ChessMapper.chess_to_sensor(pos)
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
+                        # Geel voor intermediate (tussenposities bij multi-captures)
+                        for pos in intermediate:
+                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            if move_sensor is not None:
+                                self.leds.set_led(move_sensor, 255, 255, 0, 0)  # GEEL
                         self.leds.show()
                 else:
-                    # Alleen legal moves (groen)
+                    # Alleen legal moves (groen/geel)
                     self.leds.clear()
-                    for pos in legal_moves:
+                    for pos in destinations:
                         move_sensor = ChessMapper.chess_to_sensor(pos)
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 0, 255, 0, 0)
+                    for pos in intermediate:
+                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        if move_sensor is not None:
+                            self.leds.set_led(move_sensor, 255, 255, 0, 0)
                     self.leds.show()
             else:
-                # Normaal blauw/groen knipperen
+                # Normaal blauw/groen/geel knipperen
                 if blink_on:
                     if sensor_num is not None:
                         self.leds.clear()
                         self.leds.set_led(sensor_num, 0, 0, 255, 0)  # BLAUW
-                        for pos in legal_moves:
+                        # Groen voor destinations
+                        for pos in destinations:
                             move_sensor = ChessMapper.chess_to_sensor(pos)
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
+                        # Geel voor intermediate
+                        for pos in intermediate:
+                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            if move_sensor is not None:
+                                self.leds.set_led(move_sensor, 255, 255, 0, 0)  # GEEL
                         self.leds.show()
                 else:
                     # Alleen legal moves
                     self.leds.clear()
-                    for pos in legal_moves:
+                    for pos in destinations:
                         move_sensor = ChessMapper.chess_to_sensor(pos)
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 0, 255, 0, 0)
+                    for pos in intermediate:
+                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        if move_sensor is not None:
+                            self.leds.set_led(move_sensor, 255, 255, 0, 0)
                     self.leds.show()
         else:
             # Reset blink state als er geen selectie is
@@ -612,6 +660,11 @@ class BaseGame(ABC):
         if self.gui.events.handle_validate_board_state_toggle_click(pos, toggles.get('validate_board_state')):
             return
         if self.gui.events.handle_debug_toggle_click(pos, toggles.get('debug_sensors')):
+            return
+        # Checkers toggles
+        if self.gui.events.handle_vs_computer_checkers_toggle_click(pos, toggles.get('vs_computer_checkers')):
+            return
+        if self.gui.events.handle_strict_touch_move_checkers_toggle_click(pos, toggles.get('strict_touch_move_checkers')):
             return
         
         # Power profile dropdown

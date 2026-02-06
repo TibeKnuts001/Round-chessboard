@@ -72,7 +72,10 @@ class Settings:
             'stockfish_threads': 1,  # Aantal CPU threads (1-4)
         },
         'checkers': {
-            # Checkers-specifieke settings kunnen hier later toegevoegd worden
+            'play_vs_computer': False,
+            'strict_touch_move': False,  # Touch-move regel
+            'cake_difficulty': 5,  # 1-10 (1=zwakst, 10=sterkst)
+            'cake_think_time': 1000,  # Denktijd in ms (500-5000)
         }
     }
     
@@ -92,6 +95,9 @@ class Settings:
         'stockfish_think_time': 'chess',
         'stockfish_depth': 'chess',
         'stockfish_threads': 'chess',
+        # Checkers
+        'ai_difficulty': 'checkers',
+        'ai_think_time': 'checkers',
     }
     
     @staticmethod
@@ -184,14 +190,55 @@ class Settings:
             else:
                 base_dict[key] = value
     
+    def _clean_for_json(self, obj, seen=None):
+        """
+        Recursief opschonen van object voor JSON serialisatie
+        
+        Args:
+            obj: Object om op te schonen
+            seen: Set van al geziene objecten (voor circular reference detectie)
+            
+        Returns:
+            JSON-serialiseerbaar object
+        """
+        if seen is None:
+            seen = set()
+        
+        # Check voor circular reference
+        obj_id = id(obj)
+        if obj_id in seen:
+            return None  # Skip circular references
+        
+        if isinstance(obj, dict):
+            seen.add(obj_id)
+            result = {}
+            for key, value in obj.items():
+                clean_value = self._clean_for_json(value, seen.copy())
+                if clean_value is not None or isinstance(value, type(None)):
+                    result[key] = clean_value
+            return result
+        elif isinstance(obj, (list, tuple)):
+            seen.add(obj_id)
+            return [self._clean_for_json(item, seen.copy()) for item in obj]
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+        else:
+            # Niet-serialiseerbaar type
+            return None
+    
     def save(self):
         """Sla settings op naar disk"""
         try:
+            # Maak een clean copy zonder circular references
+            clean_settings = self._clean_for_json(self.settings)
+            
             with open(self.settings_file, 'w') as f:
-                json.dump(self.settings, f, indent=2)
+                json.dump(clean_settings, f, indent=2)
             print(f"Settings opgeslagen naar {self.settings_file}")
         except Exception as e:
             print(f"Fout bij opslaan settings: {e}")
+            import traceback
+            traceback.print_exc()
     
     def get(self, key, default=None, section=None):
         """

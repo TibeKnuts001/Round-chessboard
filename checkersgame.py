@@ -4,7 +4,7 @@ Checkers Game - American Checkers / English Draughts
 
 Gebruikt de gedeelde architectuur:
 - BaseGame voor shared game loop logic
-- CheckersEngine voor checkers-specifieke rules (pydraughts)
+- CheckersEngine voor checkers-specifieke rules (py-draughts)
 - CheckersGUI voor checkers-specifieke rendering
 - Hardware (LEDs, sensors) gedeeld met chess
 
@@ -15,7 +15,7 @@ Dit toont hoe de refactoring werkt:
 """
 
 from lib.core.base_game import BaseGame
-from lib.games.checkers import CheckersEngine, CheckersGUI
+from lib.games.checkers import CheckersEngine, CheckersGUI, CheckersAIEngine
 
 
 class CheckersGame(BaseGame):
@@ -29,13 +29,46 @@ class CheckersGame(BaseGame):
         """Maak checkers GUI"""
         return CheckersGUI(engine)
     
+    def _is_vs_computer_enabled(self):
+        """Check of VS Computer mode aan staat voor checkers"""
+        vs_comp = self.gui.settings.get('play_vs_computer', False, section='checkers')
+        return vs_comp
+    
     def _create_ai(self):
-        """Geen AI voor checkers (nog niet geïmplementeerd)"""
-        return None
+        """Maak AI als VS Computer enabled is"""
+        # Check of we in checkers sectie zitten (niet chess)
+        if not self._is_vs_computer_enabled():
+            return None
+        
+        print("Initializing Checkers AI...")
+        difficulty = self.gui.settings.get('ai_difficulty', 5, section='checkers')
+        think_time = self.gui.settings.get('ai_think_time', 1000, section='checkers')
+        ai_engine = CheckersAIEngine(difficulty=difficulty, think_time=think_time)
+        
+        return ai_engine
     
     def make_computer_move(self):
-        """Checkers AI nog niet geïmplementeerd"""
-        pass  # TODO: Implementeer checkers AI
+        """Laat AI een zet doen"""
+        if not self.ai:
+            print("WARNING: make_computer_move called but no AI available")
+            return
+        
+        print("\nAI denkt...")
+        
+        # Haal beste zet op van AI
+        # AlphaBetaEngine gebruikt alleen depth, geen think_time
+        best_move = self.ai.get_best_move(self.engine.board)
+        
+        if best_move:
+            # Voer zet uit
+            try:
+                self.engine.board.push(best_move)
+                self.engine.move_count += 1  # Track move count
+                print(f"AI speelt: {best_move}")
+            except Exception as e:
+                print(f"Fout bij AI zet: {e}")
+        else:
+            print("AI kon geen zet vinden")
 
 
 def main():
