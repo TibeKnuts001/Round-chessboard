@@ -238,7 +238,7 @@ class UIWidgets:
         return rect
     
     @staticmethod
-    def draw_button(screen, rect, label, font_small, is_primary=True):
+    def draw_button(screen, rect, label, font_small, is_primary=True, is_danger=False):
         """
         Teken een standaard button
         
@@ -248,17 +248,28 @@ class UIWidgets:
             label: Button tekst
             font_small: Font voor tekst
             is_primary: Of dit een primary button is (blauwe kleur)
+            is_danger: Of dit een danger button is (rode kleur)
             
         Returns:
             De rect (voor click detection)
         """
         # Button kleur
-        color = UIWidgets.COLOR_BUTTON if is_primary else (150, 150, 150)
+        if is_danger:
+            color = (200, 50, 50)  # Rood
+        elif is_primary:
+            color = UIWidgets.COLOR_BUTTON
+        else:
+            color = (150, 150, 150)
         
         # Hover effect
         mouse_pos = pygame.mouse.get_pos()
         if rect.collidepoint(mouse_pos):
-            color = UIWidgets.COLOR_BUTTON_HOVER if is_primary else (180, 180, 180)
+            if is_danger:
+                color = (230, 70, 70)  # Lichter rood bij hover
+            elif is_primary:
+                color = UIWidgets.COLOR_BUTTON_HOVER
+            else:
+                color = (180, 180, 180)
         
         # Draw button
         pygame.draw.rect(screen, color, rect, border_radius=8)

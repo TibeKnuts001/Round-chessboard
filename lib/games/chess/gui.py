@@ -95,24 +95,25 @@ class ChessGUI:
         total_button_width = 2 * button_width + button_spacing
         button_start_x = self.board_size + (self.sidebar_width - total_button_width) // 2
         
-        # Eerste rij (New Game, Exit)
+        # Eerste rij (New Game - full width)
+        full_button_width = total_button_width
         self.new_game_button = pygame.Rect(
             button_start_x,
             self.screen_height - 130,
+            full_button_width,
+            button_height
+        )
+        
+        # Tweede rij (Settings, Exit)
+        self.settings_button = pygame.Rect(
+            button_start_x,
+            self.screen_height - 130 + button_height + button_spacing,
             button_width,
             button_height
         )
         
         self.exit_button = pygame.Rect(
             button_start_x + button_width + button_spacing,
-            self.screen_height - 130,
-            button_width,
-            button_height
-        )
-        
-        # Tweede rij (Settings, placeholder)
-        self.settings_button = pygame.Rect(
-            button_start_x,
             self.screen_height - 130 + button_height + button_spacing,
             button_width,
             button_height

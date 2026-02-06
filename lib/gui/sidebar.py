@@ -67,8 +67,8 @@ class BaseSidebarRenderer:
     def draw_buttons(self, new_game_button, exit_button, settings_button):
         """Teken alle control buttons met UIWidgets"""
         UIWidgets.draw_button(self.screen, new_game_button, "New Game", self.font_small, is_primary=True)
-        UIWidgets.draw_button(self.screen, exit_button, "Exit", self.font_small, is_primary=False)
         UIWidgets.draw_button(self.screen, settings_button, "Settings", self.font_small, is_primary=False)
+        UIWidgets.draw_button(self.screen, exit_button, "Exit", self.font_small, is_primary=False, is_danger=True)
     
     def draw_text_line(self, text, y_offset, bold=False):
         """
