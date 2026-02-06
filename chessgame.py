@@ -28,6 +28,10 @@ class ChessGame(BaseGame):
         """Maak chess GUI"""
         return ChessGUI(engine)
     
+    def _is_strict_touch_move_enabled(self):
+        """Check of strict touch-move aan staat voor chess"""
+        return self.gui.settings.get('strict_touch_move', False, section='chess')
+    
     def _create_ai(self):
         """Maak Stockfish AI als VS Computer enabled is"""
         skill = self.gui.settings.get('stockfish_skill_level', 10)

@@ -124,6 +124,8 @@ class ChessGUI:
         self.show_new_game_confirm = False
         self.show_power_dropdown = False  # Power profile dropdown open/gesloten
         self.highlighted_squares = []
+        self.last_move_from = None  # Voor highlighting van laatste zet
+        self.last_move_to = None
         self.dragging_slider = False
         self.dragging_stockfish_slider = False
         self.selected_piece = None  # Opgepakte stuk (chess.Piece object)
@@ -253,6 +255,12 @@ class ChessGUI:
         """
         self.selected_piece = piece
         self.selected_piece_from = from_square
+    
+    def set_last_move(self, from_square, to_square, intermediate=None):
+        """Set laatste zet voor highlighting (intermediate parameter voor checkers compatibility)"""
+        self.last_move_from = from_square
+        self.last_move_to = to_square
+        # Chess gebruikt geen intermediate, maar accepteer parameter voor compatibility
     
     def update_sensor_debug_states(self, sensor_states):
         """

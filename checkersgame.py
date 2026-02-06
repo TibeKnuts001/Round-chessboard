@@ -34,6 +34,10 @@ class CheckersGame(BaseGame):
         vs_comp = self.gui.settings.get('play_vs_computer', False, section='checkers')
         return vs_comp
     
+    def _is_strict_touch_move_enabled(self):
+        """Check of strict touch-move aan staat voor checkers"""
+        return self.gui.settings.get('strict_touch_move', False, section='checkers')
+    
     def _create_ai(self):
         """Maak AI als VS Computer enabled is"""
         # Check of we in checkers sectie zitten (niet chess)
@@ -69,6 +73,32 @@ class CheckersGame(BaseGame):
                 print(f"Fout bij AI zet: {e}")
         else:
             print("AI kon geen zet vinden")
+    
+    def _update_ai_status(self):
+        """Update AI status als play_vs_computer setting verandert"""
+        vs_computer_enabled = self.gui.settings.get('play_vs_computer', False, section='checkers')
+        difficulty = self.gui.settings.get('ai_difficulty', 5, section='checkers')
+        think_time = self.gui.settings.get('ai_think_time', 1000, section='checkers')
+        
+        if vs_computer_enabled and not self.ai:
+            # AI moet aangemaakt worden
+            print(f"Starting Checkers AI (difficulty {difficulty}, think_time {think_time}ms)...")
+            self.ai = self._create_ai()
+            
+        elif not vs_computer_enabled and self.ai:
+            # AI moet uitgeschakeld worden
+            print("Stopping Checkers AI...")
+            self.ai = None
+            
+        elif vs_computer_enabled and self.ai:
+            # AI is al actief, update parameters indien nodig
+            if hasattr(self.ai, 'difficulty') and self.ai.difficulty != difficulty:
+                print(f"Updating AI difficulty to {difficulty}...")
+                self.ai.difficulty = difficulty
+            
+            if hasattr(self.ai, 'think_time') and self.ai.think_time != think_time:
+                print(f"Updating AI think_time to {think_time}ms...")
+                self.ai.think_time = think_time
 
 
 def main():

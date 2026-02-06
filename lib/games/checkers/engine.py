@@ -186,7 +186,8 @@ class CheckersEngine(BaseEngine):
             to_pos: Naar positie (bijv. 'F4')
             
         Returns:
-            True als zet geldig was, False anders
+            Dict met 'success': bool, 'intermediate': list van intermediate squares (bij multi-captures)
+            Of True/False voor backwards compatibility
         """
         from_square = self.CHESS_TO_CHECKERS.get(from_pos.upper())
         to_square = self.CHESS_TO_CHECKERS.get(to_pos.upper())
@@ -208,6 +209,17 @@ class CheckersEngine(BaseEngine):
             if move_from == from_square and move_to == to_square:
                 self.board.push(move)
                 self.move_count += 1  # Track move count
+                
+                # Haal intermediate squares op voor multi-captures
+                intermediate = []
+                if hasattr(move, 'square_list') and len(move.square_list) > 2:
+                    # Multi-capture: square_list bevat [from, intermediate..., to] (0-indexed)
+                    for sq in move.square_list[1:-1]:  # Skip eerste en laatste
+                        chess_pos = self.CHECKERS_TO_CHESS.get(sq + 1)  # +1 omdat 0-indexed
+                        if chess_pos:
+                            intermediate.append(chess_pos)
+                
+                return {'success': True, 'intermediate': intermediate}
                 return True
         
         return False

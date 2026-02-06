@@ -48,13 +48,14 @@ class CheckersBoardRenderer(BaseBoardRenderer):
         
         return pieces
     
-    def draw_board(self, highlighted_squares=None):
+    def draw_board(self, highlighted_squares=None, last_move=None):
         """
-        Teken checkers bord met highlighted squares
+        Teken checkers bord met highlighted squares en last move
         
         Args:
             highlighted_squares: Dict met 'destinations' (groen) en 'intermediate' (geel) keys
                                Of list voor backwards compatibility
+            last_move: Tuple (from_square, to_square, intermediate_list) van laatste zet voor subtiele highlighting
         """
         # Parse input
         if isinstance(highlighted_squares, dict):
@@ -65,8 +66,19 @@ class CheckersBoardRenderer(BaseBoardRenderer):
             destinations = [sq.lower() for sq in (highlighted_squares or [])]
             intermediate = []
         
+        # Parse last move (inclusief intermediate squares)
+        last_move_squares = []
+        last_move_intermediate = []
+        if last_move:
+            if len(last_move) >= 2:
+                last_move_squares = [last_move[0].lower(), last_move[1].lower()]
+            if len(last_move) >= 3 and last_move[2]:  # Intermediate squares
+                last_move_intermediate = [sq.lower() for sq in last_move[2]]
+        
         # Kleuren voor highlights
         COLOR_INTERMEDIATE = (255, 255, 0)  # Geel voor tussenposities
+        COLOR_LAST_MOVE = (200, 180, 140)  # Subtiel beige/goud voor laatste zet
+        COLOR_LAST_MOVE_INTERMEDIATE = (160, 150, 120)  # Nog subtieler voor intermediate van laatste zet
         
         for row in range(8):
             for col in range(8):
@@ -78,11 +90,15 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 
                 square_notation = self._get_square_notation(row, col)
                 
-                # Kies kleur: geel voor intermediate, groen voor destinations, anders normaal
+                # Kies kleur: prioriteit: intermediate > destinations > last_move > last_move_intermediate > normaal
                 if square_notation in intermediate:
                     color = COLOR_INTERMEDIATE
                 elif square_notation in destinations:
                     color = self.COLOR_HIGHLIGHT
+                elif square_notation in last_move_squares:
+                    color = COLOR_LAST_MOVE
+                elif square_notation in last_move_intermediate:
+                    color = COLOR_LAST_MOVE_INTERMEDIATE
                 else:
                     color = self.COLOR_DARK_SQUARE if is_dark else self.COLOR_LIGHT_SQUARE
                 

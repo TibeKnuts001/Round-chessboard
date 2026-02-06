@@ -293,7 +293,7 @@ class BaseGame(ABC):
             # Check of stuk teruggeplaatst wordt op originele positie
             if position == self.selected_square:
                 # Check strict touch-move setting
-                strict_touch_move = self.gui.settings.get('strict_touch_move', False)
+                strict_touch_move = self._is_strict_touch_move_enabled()
                 
                 if strict_touch_move:
                     print(f"  Strict touch-move: stuk teruggeplaatst - ROOD knipperen!")
@@ -318,8 +318,24 @@ class BaseGame(ABC):
                     return
             
             # Probeer zet te maken
-            if self.engine.make_move(self.selected_square, position):
+            move_result = self.engine.make_move(self.selected_square, position)
+            
+            # Parse result (kan bool of dict zijn)
+            if isinstance(move_result, dict):
+                move_success = move_result.get('success', False)
+                move_intermediate = move_result.get('intermediate', [])
+            else:
+                move_success = bool(move_result)
+                move_intermediate = []
+            
+            if move_success:
                 print(f"  Zet: {self.selected_square} -> {position}")
+                
+                # Bewaar last move voor highlighting (inclusief intermediate squares)
+                last_move_from = self.selected_square
+                last_move_to = position
+                if hasattr(self.gui, 'set_last_move'):
+                    self.gui.set_last_move(last_move_from, last_move_to, move_intermediate)
                 
                 # Clear highlights en LEDs
                 self.gui.highlight_squares([])
@@ -516,7 +532,27 @@ class BaseGame(ABC):
                     self.leds.show()
         else:
             # Reset blink state als er geen selectie is
-            self.last_blink_state = None
+            if self.last_blink_state is not None:
+                self.last_blink_state = None
+                self.leds.clear()
+                
+                # Toon laatste zet in dim wit (als die bestaat)
+                if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from and self.gui.last_move_to:
+                    from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
+                    to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
+                    if from_sensor is not None:
+                        self.leds.set_led(from_sensor, 30, 30, 30, 10)  # Dim wit
+                    if to_sensor is not None:
+                        self.leds.set_led(to_sensor, 30, 30, 30, 10)  # Dim wit
+                    
+                    # Toon ook intermediate squares in paars/magenta
+                    if hasattr(self.gui, 'last_move_intermediate'):
+                        for inter_pos in self.gui.last_move_intermediate:
+                            inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                            if inter_sensor is not None:
+                                self.leds.set_led(inter_sensor, 40, 0, 40, 0)  # Dim paars/magenta
+                
+                self.leds.show()
     
     def _validate_board_if_enabled(self, current_sensors):
         """Valideer board state als validatie enabled is"""
@@ -626,6 +662,15 @@ class BaseGame(ABC):
                 self.engine.reset()
                 self.gui.show_new_game_confirm = False
                 self._clear_selection()
+                
+                # Reset last move highlighting
+                if hasattr(self.gui, 'set_last_move'):
+                    self.gui.set_last_move(None, None)
+                
+                # Forceer LED clear (ook als er geen selectie was)
+                self.leds.clear()
+                self.leds.show()
+                
             elif self.gui.handle_new_game_no_click(pos, new_game_no_button):
                 pass
         
@@ -715,7 +760,7 @@ class BaseGame(ABC):
             if self.selected_square:
                 # Klik op hetzelfde veld?
                 if clicked_square == self.selected_square:
-                    strict_touch_move = self.gui.settings.get('strict_touch_move', False)
+                    strict_touch_move = self._is_strict_touch_move_enabled()
                     if strict_touch_move:
                         print(f"\nStrict touch-move: mag niet deselecteren door te klikken!")
                         self.show_temp_message("Cannot deselect - Touch-move rule!", duration=2000)

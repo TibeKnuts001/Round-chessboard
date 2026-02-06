@@ -118,6 +118,9 @@ class CheckersGUI:
         self.show_new_game_confirm = False
         self.show_power_dropdown = False
         self.highlighted_squares = {'destinations': [], 'intermediate': []}
+        self.last_move_from = None  # Voor highlighting van laatste zet
+        self.last_move_to = None
+        self.last_move_intermediate = []  # Tussenposities bij multi-captures
         self.selected_piece = None
         self.selected_piece_from = None
         self.active_settings_tab = 'general'
@@ -180,7 +183,12 @@ class CheckersGUI:
             if self.selected_piece_from:
                 highlights.append(self.selected_piece_from)
         
-        self.board_renderer.draw_board(highlighted_squares=highlights)
+        # Geef last move mee voor subtiele highlighting
+        last_move = None
+        if self.last_move_from and self.last_move_to:
+            last_move = (self.last_move_from, self.last_move_to, self.last_move_intermediate)
+        
+        self.board_renderer.draw_board(highlighted_squares=highlights, last_move=last_move)
     
     def draw_coordinates(self):
         """Teken coordinaten"""
@@ -318,6 +326,12 @@ class CheckersGUI:
         """Set selected piece"""
         self.selected_piece = piece
         self.selected_piece_from = from_square
+    
+    def set_last_move(self, from_square, to_square, intermediate=None):
+        """Set laatste zet voor highlighting (inclusief intermediate squares bij multi-captures)"""
+        self.last_move_from = from_square
+        self.last_move_to = to_square
+        self.last_move_intermediate = intermediate if intermediate else []
     
     def update_sensor_debug_states(self, sensor_states):
         """Update sensor debug visualisatie"""
