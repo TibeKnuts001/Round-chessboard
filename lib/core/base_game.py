@@ -34,6 +34,7 @@ from lib.hardware.sensors import SensorReader
 from lib.hardware.mapping import ChessMapper  # TODO: Hernoemen naar BoardMapper
 from lib.settings import Settings
 from lib.effects.led_animations import LEDAnimator
+from lib.gui.screensaver import Screensaver
 
 
 class BaseGame(ABC):
@@ -80,6 +81,14 @@ class BaseGame(ABC):
         # LED Animator voor idle effects
         self.led_animator = LEDAnimator(self.leds)
         self.led_animator.start_random_animation()  # Start animatie bij startup
+        
+        # Screensaver (start na 1 minuut inactiviteit als game niet gestart)
+        self.screensaver = Screensaver(self.screen, "assets/screensaver/screensaver.png")
+        self.screensaver_active = False
+        self.screensaver_starting = False  # Flag voor delayed start
+        self.screensaver_start_time = 0
+        self.last_activity_time = time.time()
+        self.screensaver_timeout = 60.0  # 1 minuut
         
         print(f"{self.__class__.__name__} klaar!")
     
@@ -208,6 +217,10 @@ class BaseGame(ABC):
             added: Set van posities waar stukken zijn neergezet
             removed: Set van posities waar stukken zijn weggehaald
         """
+        # Reset activity timer
+        if added or removed:
+            self.last_activity_time = time.time()
+        
         for pos in removed:
             print(f"[SENSOR EVENT] Stuk weggehaald van {pos}")
             self.handle_piece_removed(pos)
@@ -362,6 +375,7 @@ class BaseGame(ABC):
                 
                 # Mark game als gestart na eerste zet
                 self.game_started = True
+                self.last_activity_time = time.time()
                 
                 # Bewaar last move voor highlighting (inclusief intermediate squares)
                 last_move_from = self.selected_square
@@ -425,6 +439,71 @@ class BaseGame(ABC):
         
         try:
             while running:
+                # Handle delayed screensaver start
+                current_time = time.time()
+                if self.screensaver_starting:
+                    elapsed = current_time - self.screensaver_start_time
+                    if elapsed > 0.5:
+                        # 500ms verstreken, nu echt starten
+                        self.screensaver_active = True
+                        self.screensaver_starting = False
+                        self.leds.clear()
+                        self.leds.show()
+                        print(f"Screensaver gestart (delayed na {elapsed:.2f}s)")
+                    else:
+                        # Nog aan het wachten
+                        if int(elapsed * 10) % 2 == 0:  # Print elke 0.2s
+                            print(f"Waiting for screensaver... {elapsed:.2f}s / 0.5s")
+                
+                # Check screensaver status (ALLEEN als game NIET gestart EN NIET in assisted setup)
+                if not self.game_started and not self.gui.assisted_setup_mode:
+                    if not self.screensaver_active and not self.screensaver_starting and (current_time - self.last_activity_time) > self.screensaver_timeout:
+                        # Start screensaver
+                        self.screensaver_active = True
+                        self.leds.clear()
+                        self.leds.show()
+                        print("Screensaver gestart (timeout)")
+                
+                # Als game gestart is of assisted setup actief: zorg dat screensaver UIT is
+                if self.game_started or self.gui.assisted_setup_mode:
+                    if self.screensaver_active or self.screensaver_starting:
+                        self.screensaver_active = False
+                        self.screensaver_starting = False
+                        print("Screensaver gestopt (game actief)")
+                
+                # Screensaver mode - simplified rendering
+                if self.screensaver_active:
+                    # Update screensaver animatie
+                    dt = clock.get_time() / 1000.0  # Convert ms to seconds
+                    self.screensaver.update(dt)
+                    self.screensaver.draw()
+                    pygame.display.flip()
+                    
+                    # Check voor events die screensaver stoppen
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            running = False
+                        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                            running = False
+                        elif event.type == pygame.MOUSEBUTTONDOWN:
+                            # Touch stops screensaver
+                            self.screensaver_active = False
+                            self.last_activity_time = current_time
+                            print("Screensaver gestopt (touch)")
+                    
+                    # Check sensor changes om screensaver te stoppen
+                    current_sensors = self.read_sensors()
+                    added, removed = self.detect_changes(current_sensors, self.previous_sensor_state)
+                    if added or removed:
+                        self.screensaver_active = False
+                        self.last_activity_time = current_time
+                        print("Screensaver gestopt (sensor)")
+                    self.previous_sensor_state = current_sensors.copy()
+                    
+                    clock.tick(30)
+                    continue  # Skip normale game loop
+                
+                # Normale game loop
                 # Update brightness indien gewijzigd
                 current_brightness = self.gui.settings.get('brightness', 20)
                 if current_brightness != self.previous_brightness:
@@ -760,6 +839,9 @@ class BaseGame(ABC):
             if event.type == pygame.QUIT:
                 return False
             elif event.type == pygame.KEYDOWN:
+                # Reset activity timer (alleen als niet screensaver starting)
+                if not self.screensaver_starting:
+                    self.last_activity_time = time.time()
                 if event.key == pygame.K_ESCAPE:
                     if self.gui.show_settings:
                         self.gui.show_settings = False
@@ -767,6 +849,9 @@ class BaseGame(ABC):
                     else:
                         return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Reset activity timer (alleen als niet screensaver starting)
+                if not self.screensaver_starting:
+                    self.last_activity_time = time.time()
                 if event.button == 1:  # Left click
                     if not self._handle_mouse_click(event.pos, gui_result):
                         return False  # Exit game
@@ -822,6 +907,7 @@ class BaseGame(ABC):
                 print("\nStarting new game (normal setup)...")
                 self.engine.reset()
                 self.game_started = True  # Set to True to show "Stop Game" button
+                self.last_activity_time = time.time()
                 self.gui.show_new_game_confirm = False
                 self._clear_selection()
                 
@@ -858,6 +944,7 @@ class BaseGame(ABC):
                 print("\nStopping game...")
                 self.engine.reset()
                 self.game_started = False  # Reset game started state
+                self.last_activity_time = time.time()  # Reset timer voor screensaver
                 self.gui.show_stop_game_confirm = False
                 self._clear_selection()
                 
@@ -887,6 +974,15 @@ class BaseGame(ABC):
         sliders = gui_result.get('sliders', {})
         toggles = gui_result.get('toggles', {})
         ok_button = gui_result.get('ok_button')
+        screensaver_button = gui_result.get('screensaver_button')
+        
+        # Check screensaver button
+        if screensaver_button and screensaver_button.collidepoint(pos):
+            self.screensaver_starting = True
+            self.screensaver_start_time = time.time()
+            self.gui.show_settings = False
+            self.gui.temp_settings = {}
+            return
         
         # Tab clicks
         if self.gui.events.handle_tab_click(pos, tabs):
@@ -908,6 +1004,16 @@ class BaseGame(ABC):
             return
         if self.gui.events.handle_strict_touch_move_checkers_toggle_click(pos, toggles.get('strict_touch_move_checkers')):
             return
+        
+        # Screensaver button (debug tab)
+        if screensaver_button:
+            if screensaver_button.collidepoint(pos):
+                print("Screensaver start over 500ms...")
+                self.screensaver_starting = True
+                self.screensaver_start_time = time.time()
+                self.gui.show_settings = False
+                self.gui.temp_settings = {}
+                return
         
         # Power profile dropdown
         if self.gui.show_power_dropdown and self.gui.events.handle_power_profile_item_click(
@@ -1167,6 +1273,7 @@ class BaseGame(ABC):
         self.gui.assisted_setup_step = 0
         self.gui.assisted_setup_waiting = False
         self.game_started = True
+        self.last_activity_time = time.time()
         self.temp_message = None
         
         # Clear LEDs

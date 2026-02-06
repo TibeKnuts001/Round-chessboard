@@ -88,7 +88,8 @@ class SettingsDialog:
             'tabs': {},
             'sliders': {},
             'toggles': {},
-            'dropdowns': {}
+            'dropdowns': {},
+            'screensaver_button': None  # Default None, wordt gezet in debug tab
         }
         
         start_x = dialog_x + (dialog_width - (len(tab_list) * (tab_width + tab_spacing) - tab_spacing)) // 2
@@ -247,7 +248,7 @@ class SettingsDialog:
         
         result['toggles']['coordinates'] = toggle_rect
         
-        y_pos += 80
+        y_pos += 55
         
         # Debug sensors toggle
         debug_toggle_rect = UIWidgets.draw_toggle(
@@ -263,7 +264,7 @@ class SettingsDialog:
         
         result['toggles']['debug_sensors'] = debug_toggle_rect
         
-        y_pos += 80
+        y_pos += 55
         
         # Board validation toggle
         validate_toggle_rect = UIWidgets.draw_toggle(
@@ -279,8 +280,26 @@ class SettingsDialog:
         
         result['toggles']['validate_board_state'] = validate_toggle_rect
         
+        y_pos += 65
+        
+        # Start Screensaver button
+        button_width = 250
+        button_height = 45
+        button_x = dialog_x + (500 - button_width) // 2  # Center in dialog
+        
+        screensaver_button_rect = pygame.Rect(button_x, y_pos, button_width, button_height)
+        screensaver_button = UIWidgets.draw_button(
+            self.screen,
+            screensaver_button_rect,
+            "Start Screensaver",
+            self.font_small,
+            is_primary=True
+        )
+        
+        result['screensaver_button'] = screensaver_button
+        
         # Info text
-        y_pos += 80
+        y_pos += 60
         info_lines = [
             "When enabled, yellow circles with 'M'",
             "(Magnet) appear in the center of squares",
@@ -289,4 +308,4 @@ class SettingsDialog:
         for line in info_lines:
             info_text = self.font_small.render(line, True, (100, 100, 100))
             self.screen.blit(info_text, (dialog_x + 50, y_pos))
-            y_pos += 25
+            y_pos += 22
