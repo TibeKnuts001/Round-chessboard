@@ -80,22 +80,49 @@ class ChessEngine(BaseEngine):
         except:
             return []
     
-    def make_move(self, from_pos, to_pos):
+    def make_move(self, from_pos, to_pos, promotion=None):
         """
         Voer zet uit
         
         Args:
             from_pos: Van positie (bijv. 'E2')
             to_pos: Naar positie (bijv. 'E4')
+            promotion: Promotion piece ('q', 'r', 'b', 'n') of None
             
         Returns:
-            True als zet geldig was, False anders
+            Dict met 'success', 'needs_promotion', 'promotion_piece' of False
         """
         try:
             from_square = chess.parse_square(from_pos.lower())
             to_square = chess.parse_square(to_pos.lower())
-            move = chess.Move(from_square, to_square)
             
+            # Check if this is a pawn promotion move
+            piece = self.board.piece_at(from_square)
+            if piece and piece.piece_type == chess.PAWN:
+                # Check if pawn reaches last rank
+                to_rank = chess.square_rank(to_square)
+                if (piece.color == chess.WHITE and to_rank == 7) or (piece.color == chess.BLACK and to_rank == 0):
+                    # This is a promotion!
+                    if promotion is None:
+                        # Need to ask for promotion choice
+                        return {'success': False, 'needs_promotion': True}
+                    else:
+                        # Create promotion move
+                        promotion_piece = {
+                            'q': chess.QUEEN,
+                            'r': chess.ROOK,
+                            'b': chess.BISHOP,
+                            'n': chess.KNIGHT
+                        }.get(promotion.lower(), chess.QUEEN)
+                        
+                        move = chess.Move(from_square, to_square, promotion=promotion_piece)
+                        if move in self.board.legal_moves:
+                            self.board.push(move)
+                            return {'success': True, 'promotion_piece': promotion}
+                        return False
+            
+            # Normal move (no promotion)
+            move = chess.Move(from_square, to_square)
             if move in self.board.legal_moves:
                 self.board.push(move)
                 return True

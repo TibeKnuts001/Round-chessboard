@@ -355,12 +355,28 @@ class BaseGame(ABC):
                     return
             
             # Probeer zet te maken
-            move_result = self.engine.make_move(self.selected_square, position)
+            move_result = self.engine.make_move(self.selected_square, position, promotion=getattr(self.gui, 'promotion_choice', None))
+            
+            # Reset promotion choice voor volgende moves
+            if hasattr(self.gui, 'promotion_choice'):
+                self.gui.promotion_choice = None
             
             # Parse result (kan bool of dict zijn)
             if isinstance(move_result, dict):
                 move_success = move_result.get('success', False)
+                needs_promotion = move_result.get('needs_promotion', False)
                 move_intermediate = move_result.get('intermediate', [])
+                
+                # Check if promotion is needed
+                if needs_promotion:
+                    print(f"  Pawn promotion required for {self.selected_square} -> {position}")
+                    # Show promotion dialog
+                    self.gui.show_promotion_dialog = True
+                    self.gui.promotion_from = self.selected_square
+                    self.gui.promotion_to = position
+                    self.gui.promotion_choice = None
+                    self.screen_dirty = True
+                    return
             else:
                 move_success = bool(move_result)
                 move_intermediate = []
@@ -928,6 +944,9 @@ class BaseGame(ABC):
                     if self.gui.show_settings:
                         self.gui.show_settings = False
                         self.gui.temp_settings = {}
+                    elif hasattr(self.gui, 'show_promotion_dialog') and self.gui.show_promotion_dialog:
+                        # Cancel promotion - blokkeer ESC tijdens promotion
+                        pass
                     else:
                         return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -991,6 +1010,69 @@ class BaseGame(ABC):
                 self._advance_setup_step()
             elif self.gui.handle_skip_setup_no_click(pos, skip_setup_no_button):
                 pass  # Gewoon dialog sluiten en doorgaan met wachten
+        
+        # Promotion dialog
+        elif hasattr(self.gui, 'show_promotion_dialog') and self.gui.show_promotion_dialog:
+            promotion_buttons = gui_result.get('promotion_buttons', {})
+            for piece_symbol, button_rect in promotion_buttons.items():
+                if button_rect.collidepoint(pos):
+                    print(f"\nPromotion choice: {piece_symbol.upper()}")
+                    # Set promotion choice en probeer move opnieuw
+                    self.gui.promotion_choice = piece_symbol
+                    self.gui.show_promotion_dialog = False
+                    
+                    # Doe de move met promotion
+                    from_pos = self.gui.promotion_from
+                    to_pos = self.gui.promotion_to
+                    
+                    move_result = self.engine.make_move(from_pos, to_pos, promotion=piece_symbol)
+                    
+                    if isinstance(move_result, dict):
+                        move_success = move_result.get('success', False)
+                    else:
+                        move_success = bool(move_result)
+                    
+                    if move_success:
+                        print(f"  Promotion successful: {from_pos} -> {to_pos} = {piece_symbol.upper()}")
+                        
+                        # Mark game als gestart
+                        self.game_started = True
+                        self.last_activity_time = time.time()
+                        
+                        # Clear highlights en LEDs
+                        self.gui.highlight_squares([])
+                        self.gui.set_selected_piece(None, None)
+                        self.leds.clear()
+                        self.leds.show()
+                        
+                        # Reset selectie EN promotion choice
+                        self.selected_square = None
+                        self.gui.promotion_choice = None
+                        self.gui.promotion_from = None
+                        self.gui.promotion_to = None
+                        
+                        # Update last move
+                        if hasattr(self.gui, 'set_last_move'):
+                            self.gui.set_last_move(from_pos, to_pos)
+                        
+                        # Check game status
+                        if self.engine.is_game_over():
+                            print(f"\n*** {self.engine.get_game_result()} ***\n")
+                        else:
+                            # Als VS Computer aan staat, laat computer zet doen
+                            if self._is_vs_computer_enabled() and self.ai:
+                                self.screen.fill(self.gui.COLOR_BG)
+                                self.gui.draw_board()
+                                self.gui.draw_pieces()
+                                self.gui.draw_debug_overlays()
+                                if self.gui.settings.get('show_coordinates', True):
+                                    self.gui.draw_coordinates()
+                                self.gui.draw_sidebar()
+                                pygame.display.flip()
+                                self.make_computer_move()
+                    
+                    self.screen_dirty = True
+                    return True
         
         # Exit confirmation dialog
         elif self.gui.show_exit_confirm:

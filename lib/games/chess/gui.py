@@ -135,6 +135,10 @@ class ChessGUI:
         self.show_stop_game_confirm = False  # Voor stop game confirmation
         self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
         self.show_undo_confirm = False  # Voor undo confirmation
+        self.show_promotion_dialog = False  # Voor pawn promotion dialog
+        self.promotion_choice = None  # 'q', 'r', 'b', 'n'
+        self.promotion_from = None  # Van positie
+        self.promotion_to = None  # Naar positie
         self.show_power_dropdown = False  # Power profile dropdown open/gesloten
         self.assisted_setup_mode = False  # Assisted setup actief
         self.assisted_setup_step = 0  # Huidige stap in assisted setup
@@ -299,6 +303,99 @@ class ChessGUI:
         """Teken new game confirmation dialog"""
         return self.dialog_renderer.draw_new_game_confirm_dialog()
     
+    def draw_promotion_dialog(self):
+        """Teken pawn promotion dialog - kies Queen, Rook, Bishop of Knight"""
+        # Detecteer kleur van pion die promoveert
+        if self.promotion_from:
+            from_square = chess.parse_square(self.promotion_from.lower())
+            piece = self.engine.board.piece_at(from_square)
+            is_white = piece.color if piece else True
+        else:
+            is_white = True  # Fallback
+        
+        # Center dialog op hele scherm (niet alleen bord)
+        dialog_width = 600
+        dialog_height = 320
+        dialog_x = (self.screen_width - dialog_width) // 2
+        dialog_y = (self.screen_height - dialog_height) // 2
+        
+        # Achtergrond overlay (over hele scherm)
+        overlay = pygame.Surface((self.screen_width, self.screen_height))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+        
+        # Dialog box
+        pygame.draw.rect(self.screen, (240, 240, 240),
+                        (dialog_x, dialog_y, dialog_width, dialog_height),
+                        border_radius=15)
+        pygame.draw.rect(self.screen, (100, 100, 100),
+                        (dialog_x, dialog_y, dialog_width, dialog_height), 3,
+                        border_radius=15)
+        
+        # Title
+        font_large = pygame.font.Font(None, 48)
+        title = font_large.render("Pawn Promotion", True, (50, 50, 50))
+        title_rect = title.get_rect(center=(dialog_x + dialog_width // 2, dialog_y + 40))
+        self.screen.blit(title, title_rect)
+        
+        # Subtitle
+        font_small = pygame.font.Font(None, 28)
+        subtitle = font_small.render("Choose promotion piece:", True, (80, 80, 80))
+        subtitle_rect = subtitle.get_rect(center=(dialog_x + dialog_width // 2, dialog_y + 85))
+        self.screen.blit(subtitle, subtitle_rect)
+        
+        # Piece buttons (4 buttons: Queen, Rook, Bishop, Knight)
+        button_size = 110
+        button_spacing = 15
+        total_width = (button_size * 4) + (button_spacing * 3)
+        start_x = dialog_x + (dialog_width - total_width) // 2
+        button_y = dialog_y + 130
+        
+        # Piece definitions met correcte symbols
+        if is_white:
+            pieces = [
+                {'name': 'Queen', 'symbol': 'q', 'image_key': 'Q'},
+                {'name': 'Rook', 'symbol': 'r', 'image_key': 'R'},
+                {'name': 'Bishop', 'symbol': 'b', 'image_key': 'B'},
+                {'name': 'Knight', 'symbol': 'n', 'image_key': 'N'}
+            ]
+        else:
+            pieces = [
+                {'name': 'Queen', 'symbol': 'q', 'image_key': 'q'},
+                {'name': 'Rook', 'symbol': 'r', 'image_key': 'r'},
+                {'name': 'Bishop', 'symbol': 'b', 'image_key': 'b'},
+                {'name': 'Knight', 'symbol': 'n', 'image_key': 'n'}
+            ]
+        
+        button_rects = {}
+        for i, piece in enumerate(pieces):
+            button_x = start_x + (i * (button_size + button_spacing))
+            button_rect = pygame.Rect(button_x, button_y, button_size, button_size)
+            
+            # Button background
+            pygame.draw.rect(self.screen, (255, 255, 255), button_rect, border_radius=10)
+            pygame.draw.rect(self.screen, (100, 100, 200), button_rect, 3, border_radius=10)
+            
+            # Teken piece image (gebruik board_renderer's piece_images)
+            if hasattr(self.board_renderer, 'piece_images'):
+                piece_image = self.board_renderer.piece_images.get(piece['image_key'])
+                if piece_image:
+                    # Schaal image naar button size (80% van button)
+                    image_size = int(button_size * 0.75)
+                    scaled_image = pygame.transform.smoothscale(piece_image, (image_size, image_size))
+                    image_rect = scaled_image.get_rect(center=(button_x + button_size // 2, button_y + button_size // 2 - 5))
+                    self.screen.blit(scaled_image, image_rect)
+            
+            # Label underneath
+            label = font_small.render(piece['name'], True, (50, 50, 50))
+            label_rect = label.get_rect(center=(button_x + button_size // 2, button_y + button_size + 20))
+            self.screen.blit(label, label_rect)
+            
+            button_rects[piece['symbol']] = button_rect
+        
+        return button_rects
+    
     def highlight_squares(self, squares):
         """
         Highlight specifieke velden
@@ -443,10 +540,15 @@ class ChessGUI:
         if self.show_undo_confirm:
             undo_yes_button, undo_no_button = self.dialog_renderer.draw_undo_confirm_dialog()
         
+        # Teken promotion dialog indien nodig
+        promotion_buttons = {}
+        if self.show_promotion_dialog:
+            promotion_buttons = self.draw_promotion_dialog()
+        
         # Teken temp message bovenop alles (als actief en geen dialogs open)
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             # Niet tonen als er een dialog open is
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm or self.show_promotion_dialog):
                 # Parse message: kan string, list of tuple (message, type) zijn
                 if isinstance(temp_message, tuple):
                     message_text, notification_type = temp_message
@@ -485,7 +587,8 @@ class ChessGUI:
             'skip_setup_yes': skip_setup_yes_button,
             'skip_setup_no': skip_setup_no_button,
             'undo_yes': undo_yes_button,
-            'undo_no': undo_no_button
+            'undo_no': undo_no_button,
+            'promotion_buttons': promotion_buttons if self.show_promotion_dialog else {}
         }
     
     def handle_settings_click(self, pos):
