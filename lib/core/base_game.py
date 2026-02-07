@@ -563,15 +563,22 @@ class BaseGame(ABC):
                     not self.selected_square and 
                     not self.invalid_return_position and
                     self.gui.settings.get('validate_board_state', False, section='debug')):
+                    old_paused_state = self.game_paused
                     self.board_mismatch_positions = self.validate_board_state(current_sensors)
                     if self.board_mismatch_positions:
                         self.game_paused = True
                         if not self.temp_message:
                             self.show_temp_message("Board mismatch! Fix sensor positions.", duration=999999)
+                        # State veranderd naar invalid
+                        if not old_paused_state:
+                            self.screen_dirty = True
                     else:
                         if self.game_paused:
                             self.game_paused = False
-                            self.temp_message = None
+                            # Clear alleen board mismatch message
+                            if self.temp_message and "Board mismatch" in str(self.temp_message):
+                                self.temp_message = None
+                            self.screen_dirty = True  # State veranderd naar valid
                 else:
                     self.board_mismatch_positions = []
                 
