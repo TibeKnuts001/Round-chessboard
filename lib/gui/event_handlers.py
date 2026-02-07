@@ -149,6 +149,17 @@ class EventHandlers:
             return True
         return False
     
+    def handle_use_worstfish_toggle_click(self, pos, toggle_rect):
+        """Handle klik op use worstfish toggle switch"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            # Toggle tijdelijk (niet permanent opslaan)
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'use_worstfish', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'use_worstfish', not current_value)
+            return True
+        return False
+    
     def handle_validate_board_state_toggle_click(self, pos, toggle_rect):
         """Handle klik op validate board state toggle switch"""
         if toggle_rect and toggle_rect.collidepoint(pos):

@@ -45,15 +45,29 @@ class ChessGame(BaseGame):
     
     def _create_ai(self):
         """Maak Stockfish AI als VS Computer enabled is"""
-        skill = self.gui.settings.get('stockfish_skill_level', 10)
-        threads = self.gui.settings.get('stockfish_threads', 1)
-        depth = self.gui.settings.get('stockfish_depth', 15)
-        stockfish = StockfishEngine(skill_level=skill, threads=threads, depth=depth)
+        # Check of worstfish mode aan staat
+        use_worstfish = self.gui.settings.get('use_worstfish', False, section='chess')
+        
+        if use_worstfish:
+            # Worstfish: gebruik normale instellingen voor evaluaties
+            # (we kiezen gewoon de slechtste zet via get_worst_move())
+            print("Using Worstfish (deliberately bad AI)")
+            skill = 15  # Goede evaluatie nodig voor worst move detection
+            threads = 1
+            depth = 15
+            stockfish = StockfishEngine(skill_level=skill, threads=threads, depth=depth)
+        else:
+            # Normale Stockfish: gebruik instellingen
+            print("Using Stockfish (strong AI)")
+            skill = self.gui.settings.get('stockfish_skill_level', 10, section='chess')
+            threads = self.gui.settings.get('stockfish_threads', 1, section='chess')
+            depth = self.gui.settings.get('stockfish_depth', 15, section='chess')
+            stockfish = StockfishEngine(skill_level=skill, threads=threads, depth=depth)
         
         # Check of stockfish succesvol is gestart
         if stockfish and not stockfish.process:
             print("Stockfish kon niet starten - VS Computer mode uitgeschakeld")
-            self.gui.settings.set('play_vs_computer', False)
+            self.gui.settings.set('play_vs_computer', False, section='chess')
             return None
         
         return stockfish
@@ -63,7 +77,10 @@ class ChessGame(BaseGame):
         if not self.ai:
             return
         
-        print("\nComputer denkt...")
+        # Check of worstfish mode aan staat
+        use_worstfish = self.gui.settings.get('use_worstfish', False, section='chess')
+        ai_name = "Worstfish" if use_worstfish else "Stockfish"
+        print(f"\n{ai_name} denkt...")
         
         # Threading voor async Stockfish berekening
         thinking_done = False
@@ -71,8 +88,12 @@ class ChessGame(BaseGame):
         
         def get_stockfish_move():
             nonlocal best_move, thinking_done
-            think_time = self.gui.settings.get('stockfish_think_time', 1000)
-            best_move = self.ai.get_best_move(self.engine.board, think_time_ms=think_time)
+            # Voor worstfish: gebruik get_worst_move(), anders get_best_move()
+            if use_worstfish:
+                best_move = self.ai.get_worst_move(self.engine.board)
+            else:
+                think_time = self.gui.settings.get('stockfish_think_time', 1000, section='chess')
+                best_move = self.ai.get_best_move(self.engine.board, think_time_ms=think_time)
             thinking_done = True
         
         # Start Stockfish in aparte thread
@@ -139,9 +160,11 @@ class ChessGame(BaseGame):
         pygame.draw.rect(self.screen, (100, 200, 255), 
                         (overlay_x, overlay_y, overlay_width, overlay_height), 5, border_radius=15)
         
-        # "Thinking..." tekst
+        # "Thinking..." tekst - toon Worstfish of Stockfish
+        use_worstfish = self.gui.settings.get('use_worstfish', False, section='chess')
+        ai_name = "Worstfish" if use_worstfish else "Stockfish"
         font = pygame.font.Font(None, 36)
-        text = font.render("Computer thinking...", True, (255, 255, 255))
+        text = font.render(f"{ai_name} thinking...", True, (255, 255, 255))
         text_rect = text.get_rect(center=(overlay_x + overlay_width // 2, overlay_y + 40))
         self.screen.blit(text, text_rect)
         
@@ -160,21 +183,36 @@ class ChessGame(BaseGame):
     
     def _update_ai_status(self):
         """Update Stockfish status indien settings gewijzigd"""
-        vs_computer_enabled = self.gui.settings.get('play_vs_computer', False)
-        stockfish_skill = self.gui.settings.get('stockfish_skill_level', 10)
-        stockfish_threads = self.gui.settings.get('stockfish_threads', 1)
-        stockfish_depth = self.gui.settings.get('stockfish_depth', 15)
+        vs_computer_enabled = self.gui.settings.get('play_vs_computer', False, section='chess')
+        use_worstfish = self.gui.settings.get('use_worstfish', False, section='chess')
+        stockfish_skill = self.gui.settings.get('stockfish_skill_level', 10, section='chess')
+        stockfish_threads = self.gui.settings.get('stockfish_threads', 1, section='chess')
+        stockfish_depth = self.gui.settings.get('stockfish_depth', 15, section='chess')
         
-        if vs_computer_enabled and not self.ai:
+        # Check of worstfish/stockfish mode is gewisseld
+        worstfish_mode_changed = False
+        if hasattr(self, '_previous_worstfish_mode'):
+            if self._previous_worstfish_mode != use_worstfish:
+                worstfish_mode_changed = True
+        self._previous_worstfish_mode = use_worstfish
+        
+        if vs_computer_enabled and (not self.ai or worstfish_mode_changed):
             # Toon loading notification VOOR laden
-            self.temp_message = ("Loading Stockfish engine...", "info")
+            ai_name = "Worstfish" if use_worstfish else "Stockfish"
+            self.temp_message = (f"Loading {ai_name} engine...", "info")
             self.temp_message_timer = pygame.time.get_ticks() + 5000
             
             # Force een redraw om notification te tonen
             self.gui.draw(self.temp_message, self.temp_message_timer)
             pygame.display.flip()
             
-            print(f"Starting Stockfish engine (skill {stockfish_skill}, threads {stockfish_threads}, depth {stockfish_depth})...")
+            # Stop oude AI als die bestaat
+            if self.ai:
+                self.ai.cleanup()
+                self.ai = None
+            
+            ai_label = "Worstfish (evaluates all moves, picks worst)" if use_worstfish else f"Stockfish (skill {stockfish_skill})"
+            print(f"Starting {ai_label}...")
             self.ai = self._create_ai()
             
             # Clear notification na laden
@@ -184,8 +222,8 @@ class ChessGame(BaseGame):
             print("Stopping Stockfish engine...")
             self.ai.cleanup()
             self.ai = None
-        elif vs_computer_enabled and self.ai:
-            # Update parameters als die veranderd zijn
+        elif vs_computer_enabled and self.ai and not use_worstfish:
+            # Update parameters als die veranderd zijn (alleen voor Stockfish, niet voor Worstfish)
             if hasattr(self.ai, 'skill_level') and self.ai.skill_level != stockfish_skill:
                 print(f"Updating Stockfish skill level to {stockfish_skill}...")
                 self.ai.skill_level = stockfish_skill

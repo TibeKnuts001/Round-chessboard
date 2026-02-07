@@ -1097,6 +1097,8 @@ class BaseGame(ABC):
             return
         if self.gui.events.handle_strict_touch_move_toggle_click(pos, toggles.get('strict_touch_move')):
             return
+        if self.gui.events.handle_use_worstfish_toggle_click(pos, toggles.get('use_worstfish')):
+            return
         if self.gui.events.handle_validate_board_state_toggle_click(pos, toggles.get('validate_board_state')):
             return
         if self.gui.events.handle_screensaver_audio_toggle_click(pos, toggles.get('screensaver_audio')):

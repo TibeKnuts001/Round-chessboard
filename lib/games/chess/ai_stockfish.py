@@ -174,6 +174,105 @@ class StockfishEngine:
         
         return best_move
     
+    def get_worst_move(self, board):
+        """
+        Kies de slechtste mogelijk zet op basis van Stockfish evaluatie
+        
+        Evalueert alle legale zetten en kiest degene die de positie
+        het meest verslechtert. Voor wit = laagste evaluatie,
+        voor zwart = hoogste evaluatie (omdat scores vanuit wit perspectief zijn).
+        
+        Args:
+            board: python-chess Board object
+        
+        Returns:
+            chess.Move object van de slechtste zet, of None als geen zetten mogelijk
+        """
+        if not self.process:
+            print("Stockfish engine niet beschikbaar")
+            return None
+        
+        legal_moves = list(board.legal_moves)
+        
+        if not legal_moves:
+            return None
+        
+        if len(legal_moves) == 1:
+            # Slechts 1 legale zet, return die
+            return legal_moves[0]
+        
+        print(f"  Evaluating {len(legal_moves)} moves to find worst...")
+        move_evaluations = []
+        
+        # Maak een kopie van het board voor evaluaties
+        # Zodat we het originele board niet aanpassen
+        eval_board = board.copy()
+        
+        for move in legal_moves:
+            # Maak zet tijdelijk op de KOPIE
+            eval_board.push(move)
+            
+            # Stuur positie naar Stockfish
+            fen = eval_board.fen()
+            self._send_command(f"position fen {fen}")
+            
+            # Evalueer met lage depth voor snelheid
+            self._send_command("go depth 5")
+            
+            # Parse evaluatie uit Stockfish output
+            score = None
+            while True:
+                line = self.process.stdout.readline().strip()
+                
+                # Parse score uit "info" lines
+                if line.startswith("info") and "score cp" in line:
+                    # Format: "info depth 5 score cp 123 ..."
+                    parts = line.split()
+                    try:
+                        cp_idx = parts.index("cp")
+                        score = int(parts[cp_idx + 1])  # Centipawns
+                    except (ValueError, IndexError):
+                        pass
+                
+                # Als mate gevonden, gebruik extreme waarde
+                elif line.startswith("info") and "score mate" in line:
+                    parts = line.split()
+                    try:
+                        mate_idx = parts.index("mate")
+                        mate_in = int(parts[mate_idx + 1])
+                        # Mate in X moves = zeer goede/slechte score
+                        if mate_in > 0:
+                            score = 10000  # Wit wint
+                        else:
+                            score = -10000  # Zwart wint
+                    except (ValueError, IndexError):
+                        pass
+                
+                # Stop bij bestmove
+                if line.startswith("bestmove"):
+                    break
+            
+            # Maak zet ongedaan op de kopie
+            eval_board.pop()
+            
+            # Als geen score gevonden, gebruik 0
+            if score is None:
+                score = 0
+            
+            move_evaluations.append((move, score))
+        
+        # Sorteer en kies slechtste zet
+        # Voor wit (turn=True): laagste score = slechtst voor wit
+        # Voor zwart (turn=False): hoogste score = slechtst voor zwart
+        if board.turn:  # Wit aan zet
+            worst_move = min(move_evaluations, key=lambda x: x[1])
+            print(f"  Worst move for white: {worst_move[0]} (score: {worst_move[1]/100:.2f})")
+        else:  # Zwart aan zet
+            worst_move = max(move_evaluations, key=lambda x: x[1])
+            print(f"  Worst move for black: {worst_move[0]} (score: {worst_move[1]/100:.2f})")
+        
+        return worst_move[0]
+    
     def cleanup(self):
         """Stop Stockfish process"""
         if self.process:

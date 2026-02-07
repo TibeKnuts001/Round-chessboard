@@ -63,6 +63,22 @@ class ChessSettingsTabs:
         slider_x = label_x + label_width + 20
         slider_width = 300
         
+        # Use Worstfish toggle
+        worstfish_toggle = UIWidgets.draw_toggle(
+            screen,
+            label_x,
+            y_pos,
+            settings.get('chess', {}).get('use_worstfish', False),
+            font_small
+        )
+        
+        label = font_small.render("Use Worstfish (weak AI)", True, UIWidgets.COLOR_BLACK)
+        screen.blit(label, (worstfish_toggle.right + 15, y_pos + 8))
+        
+        result['toggles']['use_worstfish'] = worstfish_toggle
+        
+        y_pos += 60
+        
         # Skill Level slider
         skill_label = font_small.render("Skill Level", True, UIWidgets.COLOR_BLACK)
         screen.blit(skill_label, (label_x, y_pos + 8))
