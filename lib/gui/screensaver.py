@@ -81,6 +81,31 @@ class Screensaver:
         self.scanline_waiting = True
         self.next_scanline_time = 15.0  # Wait 15 seconds before first scanline
         
+        # Audio
+        self.audio_playing = False
+        
+    def start_audio(self):
+        """Start screensaver audio"""
+        try:
+            if not self.audio_playing:
+                pygame.mixer.init()
+                pygame.mixer.music.load("assets/audio/screensaver.mp3")
+                pygame.mixer.music.play(-1)  # Loop forever
+                self.audio_playing = True
+                print("✓ Screensaver audio gestart")
+        except Exception as e:
+            print(f"✗ Kon screensaver audio niet starten: {e}")
+    
+    def stop_audio(self):
+        """Stop screensaver audio"""
+        try:
+            if self.audio_playing:
+                pygame.mixer.music.stop()
+                self.audio_playing = False
+                print("✓ Screensaver audio gestopt")
+        except Exception as e:
+            print(f"✗ Kon screensaver audio niet stoppen: {e}")
+        
     def update(self, dt):
         """
         Update animation state

@@ -1,60 +1,67 @@
-#!/bin/bash
-# Run Python script in virtual environment
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Bepaal de directory waar dit script staat (altijd /home/tibe/chess)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR" || exit 1
+APP_NAME="${1:-chess}"
+PY_FILE="${2:-chessgame.py}"
 
-# Export display voor pygame via SSH
-export DISPLAY=:0
-export XDG_RUNTIME_DIR=/run/user/$(id -u)
+echo "Starting ${APP_NAME} game..."
+echo "User: $(id -un)  UID: $(id -u)"
 
-# Geef toegang tot X11 display (nodig voor pygame via SSH)
-# Check alleen als xhost beschikbaar is en display actief is
-if command -v xhost >/dev/null 2>&1; then
-    xhost +local: >/dev/null 2>&1 || true
+# Ga naar de directory van deze run.sh (zodat assets/ paden kloppen)
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Zorg dat we NIET als root draaien (root mist vaak user audio session)
+if [[ "$(id -u)" -eq 0 ]]; then
+  echo "ERROR: Do not run this script as root/sudo (PipeWire/BT audio will fail)."
+  exit 1
 fi
 
-# Check of venv bestaat
-if [ ! -d "venv" ]; then
-    echo "❌ venv niet gevonden. Run eerst: $SCRIPT_DIR/install_venv.sh"
-    exit 1
+# Zet user runtime dir (nodig voor PipeWire/Pulse compat sockets)
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+# Zorg dat DBus user bus klopt (veel desktop audio routing hangt hier indirect van af)
+if [[ -S "${XDG_RUNTIME_DIR}/bus" ]]; then
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
 fi
 
-# Check of game parameter is opgegeven
-if [ -z "$1" ]; then
-    echo "❌ Game parameter required!"
-    echo "Usage: $0 <game>"
-    echo "  where <game> is: chess, checkers"
-    echo ""
-    echo "Or use:"
-    echo "  ./chess.sh    - Start chess game"
-    echo "  ./checkers.sh - Start checkers game"
-    exit 1
+# Handig om te zien of sockets bestaan (debug)
+if [[ -S "${XDG_RUNTIME_DIR}/pipewire-0" ]]; then
+  echo "PipeWire socket OK: ${XDG_RUNTIME_DIR}/pipewire-0"
+else
+  echo "WARNING: PipeWire socket not found yet: ${XDG_RUNTIME_DIR}/pipewire-0"
 fi
 
-# Bepaal script op basis van game parameter
-case "$1" in
-    chess)
-        SCRIPT="chessgame.py"
-        echo "Starting chess game..."
-        ;;
-    checkers)
-        SCRIPT="checkersgame.py"
-        echo "Starting checkers game..."
-        ;;
-    *)
-        echo "❌ Unknown game: $1"
-        echo "Valid options: chess, checkers"
-        exit 1
-        ;;
-esac
-
-# Check of script bestaat
-if [ ! -f "$SCRIPT" ]; then
-    echo "❌ Game script not found: $SCRIPT"
-    exit 1
+if [[ -S "${XDG_RUNTIME_DIR}/pulse/native" ]]; then
+  echo "Pulse compat socket OK: ${XDG_RUNTIME_DIR}/pulse/native"
+else
+  echo "Note: pulse/native not present (that's OK if you use pure PipeWire)."
 fi
 
-echo ""
-sudo venv/bin/python3 "$SCRIPT" "${@:2}"
+# Gebruik venv python als die bestaat
+PYTHON="./venv/bin/python3"
+if [[ ! -x "$PYTHON" ]]; then
+  PYTHON="$(command -v python3)"
+fi
+
+echo "Python: $PYTHON"
+echo "PWD: $(pwd)"
+echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-"(not set)"}"
+
+# Optioneel: SDL audio driver niet forceren, laat SDL zelf kiezen (werkt vaak best)
+# Als je ooit wél wil forceren naar pulse-compat:
+# export SDL_AUDIODRIVER="pulseaudio"
+
+# Fix /dev/mem permissions voor LED hardware (ws2811)
+if [[ -e /dev/mem ]]; then
+  CURRENT_PERMS=$(stat -c "%a" /dev/mem 2>/dev/null || stat -f "%Lp" /dev/mem 2>/dev/null)
+  if [[ "$CURRENT_PERMS" != "777" ]]; then
+    echo "Fixing /dev/mem permissions (current: $CURRENT_PERMS, need: 777)"
+    sudo chmod 777 /dev/mem
+  else
+    echo "✓ /dev/mem permissions OK ($CURRENT_PERMS)"
+  fi
+fi
+
+exec "$PYTHON" "$PY_FILE"

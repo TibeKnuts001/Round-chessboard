@@ -449,6 +449,7 @@ class BaseGame(ABC):
                         # 500ms verstreken, nu echt starten
                         self.screensaver_active = True
                         self.screensaver_starting = False
+                        self.screensaver.start_audio()
                         self.leds.clear()
                         self.leds.show()
                         print(f"Screensaver gestart (delayed na {elapsed:.2f}s)")
@@ -462,6 +463,7 @@ class BaseGame(ABC):
                     if not self.screensaver_active and not self.screensaver_starting and (current_time - self.last_activity_time) > self.screensaver_timeout:
                         # Start screensaver
                         self.screensaver_active = True
+                        self.screensaver.start_audio()
                         self.leds.clear()
                         self.leds.show()
                         print("Screensaver gestart (timeout)")
@@ -469,6 +471,7 @@ class BaseGame(ABC):
                 # Als game gestart is of assisted setup actief: zorg dat screensaver UIT is
                 if self.game_started or self.gui.assisted_setup_mode:
                     if self.screensaver_active or self.screensaver_starting:
+                        self.screensaver.stop_audio()
                         self.screensaver_active = False
                         self.screensaver_starting = False
                         print("Screensaver gestopt (game actief)")
@@ -489,6 +492,7 @@ class BaseGame(ABC):
                             running = False
                         elif event.type == pygame.MOUSEBUTTONDOWN:
                             # Touch stops screensaver
+                            self.screensaver.stop_audio()
                             self.screensaver_active = False
                             self.last_activity_time = current_time
                             print("Screensaver gestopt (touch)")
@@ -497,6 +501,7 @@ class BaseGame(ABC):
                     current_sensors = self.read_sensors()
                     added, removed = self.detect_changes(current_sensors, self.previous_sensor_state)
                     if added or removed:
+                        self.screensaver.stop_audio()
                         self.screensaver_active = False
                         self.last_activity_time = current_time
                         print("Screensaver gestopt (sensor)")
