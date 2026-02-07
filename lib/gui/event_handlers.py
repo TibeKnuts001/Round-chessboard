@@ -212,7 +212,7 @@ class EventHandlers:
         slider_configs = {
             'brightness': ('brightness', 0, 100),
             'skill': ('stockfish_skill_level', 0, 20),
-            'think_time': ('stockfish_think_time', 500, 5000),
+            'think_time': ('stockfish_think_time', 500, 10000),
             'depth': ('stockfish_depth', 5, 25),
             'threads': ('stockfish_threads', 1, 4),
             'ai_difficulty': ('ai_difficulty', 1, 10),
@@ -371,13 +371,13 @@ class EventHandlers:
     def handle_think_time_slider_click(self, pos, slider_rect):
         """Handle think time slider click to start dragging"""
         if self._handle_slider_click(pos, slider_rect, 'think_time'):
-            self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 5000)
+            self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 10000)
             return True
         return False
     
     def handle_think_time_slider_drag(self, pos, slider_rect):
         """Handle think time slider drag"""
-        return self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 5000)
+        return self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 10000)
     
     def handle_depth_slider_click(self, pos, slider_rect):
         """Handle depth slider click to start dragging"""

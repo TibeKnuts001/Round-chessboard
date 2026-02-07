@@ -70,7 +70,7 @@ class Settings:
             'play_vs_computer': False,
             'strict_touch_move': False,  # Touch-move regel
             'stockfish_skill_level': 10,  # 0-20 (0=zwakst, 20=sterkst)
-            'stockfish_think_time': 1000,  # Denktijd in ms (500-5000)
+            'stockfish_think_time': 1000,  # Denktijd in ms (500-10000)
             'stockfish_depth': 15,  # Maximale zoekdiepte (5-25)
             'stockfish_threads': 1,  # Aantal CPU threads (1-4)
         },

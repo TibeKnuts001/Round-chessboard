@@ -149,8 +149,11 @@ class StockfishEngine:
         self._send_command(f"position fen {fen}")
         
         # Vraag beste zet (gebruik think_time of depth)
+        # movetime = vaste tijd, wtime/btime = max tijd (Stockfish kan eerder stoppen)
         if think_time_ms is not None:
-            self._send_command(f"go movetime {think_time_ms}")
+            # Gebruik wtime/btime voor intelligente tijdverdeling
+            # Stockfish stopt eerder als hij zeker is van de beste zet
+            self._send_command(f"go wtime {think_time_ms} btime {think_time_ms} winc 0 binc 0")
         else:
             self._send_command(f"go depth {self.depth}")
         
