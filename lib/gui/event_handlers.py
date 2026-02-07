@@ -298,6 +298,18 @@ class EventHandlers:
             return True
         return False
     
+    def handle_validate_board_state_toggle_click(self, pos, toggle_rect):
+        """Handle klik op validate board state toggle switch"""
+        if toggle_rect is None:
+            return False
+        
+        if toggle_rect.collidepoint(pos):
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'validate_board_state', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'validate_board_state', not current_value)
+            print(f"Validate board state toggled: {not current_value}")
+            return True
+        return False
+    
     def handle_brightness_slider_drag(self, pos, slider_rect):
         """Handle brightness slider drag (tijdens slepen)"""
         if self.gui.dragging_slider == 'brightness' and slider_rect:

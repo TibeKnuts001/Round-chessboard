@@ -282,12 +282,12 @@ class SettingsDialog:
         
         y_pos += 55
         
-        # Board validation toggle
+        # Validate board state toggle
         validate_toggle_rect = UIWidgets.draw_toggle(
             self.screen,
             toggle_x,
             y_pos,
-            settings.get('debug', {}).get('validate_board_state', True),
+            settings.get('debug', {}).get('validate_board_state', False),
             self.font_small
         )
         

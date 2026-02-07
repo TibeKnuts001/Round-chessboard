@@ -64,7 +64,7 @@ class Settings:
         'debug': {
             'show_coordinates': True,
             'debug_sensors': False,
-            'validate_board_state': True,  # Valideer fysiek bord vs engine state
+            'validate_board_state': False,
         },
         'chess': {
             'play_vs_computer': False,
