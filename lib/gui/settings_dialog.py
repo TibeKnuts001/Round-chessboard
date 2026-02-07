@@ -228,6 +228,22 @@ class SettingsDialog:
         result['sliders']['brightness'] = brightness_slider_rect
         result['power_profiles'] = power_profiles
         result['max_brightness'] = max_brightness
+        
+        y_pos += 70
+        
+        # Screensaver Audio toggle
+        audio_toggle_rect = UIWidgets.draw_toggle(
+            self.screen,
+            label_x,
+            y_pos,
+            settings.get('general', {}).get('screensaver_audio', True),
+            self.font_small
+        )
+        
+        audio_label = self.font_small.render("Screensaver Audio", True, UIWidgets.COLOR_BLACK)
+        self.screen.blit(audio_label, (audio_toggle_rect.right + 15, y_pos + 8))
+        
+        result['toggles']['screensaver_audio'] = audio_toggle_rect
     
     def _draw_debug_tab(self, dialog_x, content_y, settings, result):
         """Teken debug tab (debug settings - shared)"""

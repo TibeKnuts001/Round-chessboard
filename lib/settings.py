@@ -58,6 +58,9 @@ class Settings:
             'brightness': 20,
             'power_profile': 1.5,  # Power limit in Ampere (0.5, 1.0, 1.5, 2.0, 2.5)
         },
+        'general': {
+            'screensaver_audio': True,  # Muziek tijdens screensaver
+        },
         'debug': {
             'show_coordinates': True,
             'debug_sensors': False,
@@ -84,6 +87,8 @@ class Settings:
         # Hardware
         'brightness': 'hardware',
         'power_profile': 'hardware',
+        # General
+        'screensaver_audio': 'general',
         # Debug
         'show_coordinates': 'debug',
         'debug_sensors': 'debug',

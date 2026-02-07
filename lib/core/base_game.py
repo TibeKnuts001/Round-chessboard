@@ -85,7 +85,7 @@ class BaseGame(ABC):
         self.led_animator.start_random_animation()  # Start animatie bij startup
         
         # Screensaver (start na 1 minuut inactiviteit als game niet gestart)
-        self.screensaver = Screensaver(self.screen, "assets/screensaver/screensaver.png")
+        self.screensaver = Screensaver(self.screen, "assets/screensaver/screensaver.png", self.gui.settings)
         self.screensaver_active = False
         self.screensaver_starting = False  # Flag voor delayed start
         self.screensaver_start_time = 0
@@ -1023,6 +1023,8 @@ class BaseGame(ABC):
         if self.gui.events.handle_strict_touch_move_toggle_click(pos, toggles.get('strict_touch_move')):
             return
         if self.gui.events.handle_validate_board_state_toggle_click(pos, toggles.get('validate_board_state')):
+            return
+        if self.gui.events.handle_screensaver_audio_toggle_click(pos, toggles.get('screensaver_audio')):
             return
         if self.gui.events.handle_debug_toggle_click(pos, toggles.get('debug_sensors')):
             return

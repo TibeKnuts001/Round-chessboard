@@ -160,6 +160,17 @@ class EventHandlers:
             return True
         return False
     
+    def handle_screensaver_audio_toggle_click(self, pos, toggle_rect):
+        """Handle klik op screensaver audio toggle switch"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            # Toggle tijdelijk (niet permanent opslaan)
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'screensaver_audio', True, section='general')
+            Settings.set_in_dict(self.gui.temp_settings, 'screensaver_audio', not current_value, section='general')
+            return True
+        return False
+    
     # Checkers-specific toggle handlers
     
     def handle_vs_computer_checkers_toggle_click(self, pos, toggle_rect):

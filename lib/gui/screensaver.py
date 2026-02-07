@@ -42,15 +42,17 @@ class Particle:
 class Screensaver:
     """Animated screensaver with static splash image and dynamic effects"""
     
-    def __init__(self, screen, splash_image_path):
+    def __init__(self, screen, splash_image_path, settings):
         """
         Initialize screensaver
         
         Args:
             screen: Pygame screen surface
             splash_image_path: Path to splash image
+            settings: Settings instance voor configuratie
         """
         self.screen = screen
+        self.settings = settings
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
         
@@ -86,6 +88,11 @@ class Screensaver:
         
     def start_audio(self):
         """Start screensaver audio"""
+        # Check of audio enabled is in settings
+        if not self.settings.get('screensaver_audio', True, section='general'):
+            print("Screensaver audio uitgeschakeld in settings")
+            return
+        
         try:
             if not self.audio_playing:
                 pygame.mixer.init()
