@@ -802,37 +802,50 @@ class BaseGame(ABC):
                                 self.leds.set_led(inter_sensor, 40, 0, 40, 0)  # Dim paars/magenta
                 
                 self.leds.show()
+        
+        # Voeg board mismatch indicators toe (altijd checken, ook zonder selected square)
+        if self.board_mismatch_positions:
+            blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
+            
+            if blink_on:
+                # Rood knipperen - zet alleen de mismatch LEDs aan
+                for pos in self.board_mismatch_positions:
+                    sensor_num = ChessMapper.chess_to_sensor(pos)
+                    if sensor_num is not None:
+                        self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD
+            else:
+                # Uit fase - clear de mismatch LEDs
+                for pos in self.board_mismatch_positions:
+                    sensor_num = ChessMapper.chess_to_sensor(pos)
+                    if sensor_num is not None:
+                        self.leds.set_led(sensor_num, 0, 0, 0, 0)  # UIT
+            
+            self.leds.show()
     
     def _validate_board_if_enabled(self, current_sensors):
         """Valideer board state als validatie enabled is"""
-        if self.gui.settings.get('validate_board_state', True):
-            if not self.selected_square:
-                self.board_mismatch_positions = self.validate_board_state(current_sensors)
+        # Valideer alleen als:
+        # 1. Het spel gestart is
+        # 2. Er geen stuk geselecteerd is (geen actieve move bezig)
+        # 3. Validatie enabled is in settings
+        if not self.game_started:
+            return
+        
+        if not self.selected_square and self.gui.settings.get('validate_board_state', True, section='debug'):
+            self.board_mismatch_positions = self.validate_board_state(current_sensors)
+            
+            if self.board_mismatch_positions:
+                # Game paused: laat missende stukken rood knipperen
+                self.game_paused = True
                 
-                if self.board_mismatch_positions:
-                    # Game paused: laat missende stukken rood knipperen
-                    self.game_paused = True
-                    blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
-                    
-                    if blink_on:
-                        self.leds.clear()
-                        for pos in self.board_mismatch_positions:
-                            sensor_num = ChessMapper.chess_to_sensor(pos)
-                            if sensor_num is not None:
-                                self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD
-                        self.leds.show()
-                    else:
-                        self.leds.clear()
-                        self.leds.show()
-                    
-                    # Toon warning message
-                    if not self.temp_message:
-                        self.show_temp_message("Board mismatch!", duration=999999)
-                else:
-                    # Board OK
-                    if self.game_paused:
-                        self.game_paused = False
-                        self.temp_message = None
+                # Toon warning message
+                if not self.temp_message:
+                    self.show_temp_message("Board mismatch!", duration=999999)
+            else:
+                # Board OK
+                if self.game_paused:
+                    self.game_paused = False
+                    self.temp_message = None
         else:
             # Validatie uitgeschakeld - reset state
             if self.game_paused or self.board_mismatch_positions:

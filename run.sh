@@ -2,7 +2,20 @@
 set -euo pipefail
 
 APP_NAME="${1:-chess}"
-PY_FILE="${2:-chessgame.py}"
+
+# Kies automatisch het juiste Python bestand op basis van de parameter
+case "$APP_NAME" in
+  chess)
+    PY_FILE="chessgame.py"
+    ;;
+  checkers)
+    PY_FILE="checkersgame.py"
+    ;;
+  *)
+    echo "ERROR: Unknown game '$APP_NAME'. Use 'chess' or 'checkers'."
+    exit 1
+    ;;
+esac
 
 echo "Starting ${APP_NAME} game..."
 echo "User: $(id -un)  UID: $(id -u)"
