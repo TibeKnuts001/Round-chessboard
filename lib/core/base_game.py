@@ -524,20 +524,6 @@ class BaseGame(ABC):
                 if self.gui.assisted_setup_mode:
                     self._update_assisted_setup_sensors()
                 
-                # Valideer board state (alleen als spel gestart en setting enabled)
-                if self.game_started and self.gui.settings.get('validate_board_state', False, section='debug'):
-                    self.board_mismatch_positions = self.validate_board_state(current_sensors)
-                    if self.board_mismatch_positions:
-                        self.game_paused = True
-                        if not self.temp_message:
-                            self.show_temp_message("Board mismatch! Fix sensor positions.", duration=999999)
-                    else:
-                        if self.game_paused:
-                            self.game_paused = False
-                            self.temp_message = None
-                else:
-                    self.board_mismatch_positions = []
-                
                 # Update sensor debug visualisatie
                 if self.gui.settings.get('debug_sensors', False, section='debug'):
                     old_states = getattr(self.gui, 'active_sensor_states', {})
@@ -570,6 +556,24 @@ class BaseGame(ABC):
                         self.handle_sensor_changes(added, removed)
                         self.screen_dirty = True  # Herteken bij sensor changes
                         self.screen_dirty = True
+                
+                # Valideer board state (NA sensor handling, zodat selected_square up-to-date is)
+                # Alleen valideren als: spel gestart, setting enabled, EN geen actieve move
+                if (self.game_started and 
+                    not self.selected_square and 
+                    not self.invalid_return_position and
+                    self.gui.settings.get('validate_board_state', False, section='debug')):
+                    self.board_mismatch_positions = self.validate_board_state(current_sensors)
+                    if self.board_mismatch_positions:
+                        self.game_paused = True
+                        if not self.temp_message:
+                            self.show_temp_message("Board mismatch! Fix sensor positions.", duration=999999)
+                    else:
+                        if self.game_paused:
+                            self.game_paused = False
+                            self.temp_message = None
+                else:
+                    self.board_mismatch_positions = []
                 
                 # Update previous state
                 self.previous_sensor_state = current_sensors.copy()
@@ -812,12 +816,29 @@ class BaseGame(ABC):
                 self.leds.show()
         
         # Board validation: rood knipperen voor mismatches
-        # Als lijst leeg is maar er waren vorige mismatches, clear die LEDs
+        # Als lijst leeg is maar er waren vorige mismatches, clear die LEDs en herstel last move
         if not self.board_mismatch_positions and self.previous_mismatch_positions:
+            # Clear alle vorige mismatch LEDs
             for pos in self.previous_mismatch_positions:
                 sensor_num = ChessMapper.chess_to_sensor(pos)
                 if sensor_num is not None:
                     self.leds.set_led(sensor_num, 0, 0, 0, 0)
+            
+            # Herstel last move LEDs (dim wit)
+            if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from:
+                from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
+                if from_sensor is not None:
+                    self.leds.set_led(from_sensor, 30, 30, 30, 10)
+            if hasattr(self.gui, 'last_move_to') and self.gui.last_move_to:
+                to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
+                if to_sensor is not None:
+                    self.leds.set_led(to_sensor, 30, 30, 30, 10)
+            if hasattr(self.gui, 'last_move_intermediate'):
+                for inter_pos in self.gui.last_move_intermediate:
+                    inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                    if inter_sensor is not None:
+                        self.leds.set_led(inter_sensor, 40, 0, 40, 0)
+            
             self.leds.show()
             self.previous_mismatch_positions = []
         elif self.board_mismatch_positions:
