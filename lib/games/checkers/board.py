@@ -104,6 +104,58 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 
                 pygame.draw.rect(self.screen, color, (x, y, self.square_size, self.square_size))
     
+    def draw_highlights(self, highlighted_squares=None, last_move=None):
+        """
+        Teken alleen highlights bovenop gecached board (voor efficiency)
+        
+        Args:
+            highlighted_squares: Dict met 'destinations' en 'intermediate' keys
+            last_move: Tuple (from_square, to_square, intermediate_list)
+        """
+        # Parse input
+        if isinstance(highlighted_squares, dict):
+            destinations = [sq.lower() for sq in highlighted_squares.get('destinations', [])]
+            intermediate = [sq.lower() for sq in highlighted_squares.get('intermediate', [])]
+        else:
+            destinations = [sq.lower() for sq in (highlighted_squares or [])]
+            intermediate = []
+        
+        # Parse last move
+        last_move_squares = []
+        last_move_intermediate = []
+        if last_move:
+            if len(last_move) >= 2:
+                last_move_squares = [last_move[0].lower(), last_move[1].lower()]
+            if len(last_move) >= 3 and last_move[2]:
+                last_move_intermediate = [sq.lower() for sq in last_move[2]]
+        
+        # Kleuren
+        COLOR_INTERMEDIATE = (255, 255, 0, 128)
+        COLOR_LAST_MOVE = (200, 180, 140, 100)
+        COLOR_LAST_MOVE_INTERMEDIATE = (160, 150, 120, 80)
+        
+        for row in range(8):
+            for col in range(8):
+                square_notation = self._get_square_notation(row, col)
+                
+                # Teken overlay alleen als highlight nodig
+                overlay = None
+                if square_notation in intermediate:
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    overlay.fill(COLOR_INTERMEDIATE)
+                elif square_notation in destinations:
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    overlay.fill((*self.COLOR_HIGHLIGHT, 128))
+                elif square_notation in last_move_squares:
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    overlay.fill(COLOR_LAST_MOVE)
+                elif square_notation in last_move_intermediate:
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    overlay.fill(COLOR_LAST_MOVE_INTERMEDIATE)
+                
+                if overlay:
+                    self.screen.blit(overlay, (col * self.square_size, row * self.square_size))
+    
     def draw_coordinates(self):
         """Teken chess coördinaten (A-H, 1-8) - zelfde als chess"""
         for i in range(8):

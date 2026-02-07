@@ -148,6 +148,12 @@ class ChessGUI:
             self.font_small
         )
         
+        # Cached board surface voor betere performance
+        self.cached_board = None
+        self.cached_pieces = None  # Cache voor pieces
+        self.board_cache_dirty = True  # Flag om te weten wanneer opnieuw te cachen
+        self.last_board_fen = None  # Track board state changes
+        
         self.sidebar_renderer = ChessSidebarRenderer(
             self.screen,
             self.board_size,
@@ -181,16 +187,54 @@ class ChessGUI:
         self.events = EventHandlers(self)
     
     def draw_board(self):
-        """Teken schaakbord"""
-        self.board_renderer.draw_board_grid(self.highlighted_squares, self.selected_piece_from, self.capture_squares)
+        """Teken schaakbord - gebruik cache voor betere performance"""
+        # Cache static board grid + coordinaten (alleen eerste keer)
+        if self.cached_board is None:
+            self.cached_board = pygame.Surface((self.board_size, self.board_size))
+            temp_screen = self.screen
+            self.screen = self.cached_board
+            self.board_renderer.screen = self.cached_board
+            
+            # Teken grid en coordinaten op cache (static, 1x)
+            self.board_renderer.draw_board_grid({}, None, set())
+            self.board_renderer.draw_coordinates()
+            
+            self.screen = temp_screen
+            self.board_renderer.screen = temp_screen
+        
+        # Blit cached board (1 blit ipv 64+)
+        self.screen.blit(self.cached_board, (0, 0))
+        
+        # Teken highlights bovenop (alleen als nodig)
+        if self.highlighted_squares or self.selected_piece_from or self.capture_squares:
+            self.board_renderer.draw_highlights(self.highlighted_squares, self.selected_piece_from, self.capture_squares)
     
     def draw_coordinates(self):
-        """Teken coördinaten"""
-        self.board_renderer.draw_coordinates()
+        """Teken coördinaten - nu in cached board, skip deze call"""
+        pass  # Coordinaten zitten al in cached board
     
     def draw_pieces(self):
-        """Teken schaakstukken"""
-        self.board_renderer.draw_pieces(self.engine.get_board())
+        """Teken schaakstukken - gebruik cache"""
+        current_board = self.engine.get_board()
+        current_fen = current_board.fen()
+        
+        # Check of board veranderd is (move gedaan)
+        if self.last_board_fen != current_fen:
+            # Board changed - maak nieuwe cache
+            self.cached_pieces = pygame.Surface((self.board_size, self.board_size), pygame.SRCALPHA)
+            temp_screen = self.screen
+            self.screen = self.cached_pieces
+            self.board_renderer.screen = self.cached_pieces
+            
+            self.board_renderer.draw_pieces(current_board)
+            
+            self.screen = temp_screen
+            self.board_renderer.screen = temp_screen
+            self.last_board_fen = current_fen
+        
+        # Blit cached pieces (alleen als cache bestaat)
+        if self.cached_pieces:
+            self.screen.blit(self.cached_pieces, (0, 0))
     
     def draw_debug_overlays(self):
         """Teken debug overlays"""

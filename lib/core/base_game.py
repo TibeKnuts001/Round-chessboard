@@ -77,6 +77,9 @@ class BaseGame(ABC):
         self.temp_message = None  # Tijdelijke berichten
         self.temp_message_timer = 0  # Wanneer bericht verdwijnt
         self.last_blink_state = None  # Track LED blink state om onnodige updates te voorkomen
+        self.screen_dirty = True  # Flag: herteken nodig (CPU optimalisatie)
+        self.last_gui_result = {}  # Cache laatste gui_result voor button detection
+        self.last_gui_result = {}  # Cache laatste gui_result voor button detection
         
         # LED Animator voor idle effects
         self.led_animator = LEDAnimator(self.leds)
@@ -534,11 +537,18 @@ class BaseGame(ABC):
                 # Clear temp message als timer verlopen is
                 if self.temp_message and pygame.time.get_ticks() >= self.temp_message_timer:
                     self.temp_message = None
+                    self.screen_dirty = True
                 
-                # Draw GUI
-                gui_result = self.gui.draw(self.temp_message, self.temp_message_timer)
+                # Draw GUI alleen als screen dirty
+                if self.screen_dirty:
+                    gui_result = self.gui.draw(self.temp_message, self.temp_message_timer)
+                    pygame.display.flip()
+                    self.screen_dirty = False
+                    self.last_gui_result = gui_result  # Cache voor volgende frame
+                else:
+                    gui_result = self.last_gui_result  # Gebruik cached result
                 
-                # Handle events
+                # Handle events (kan screen_dirty zetten)
                 running = self._handle_events(gui_result)
                 
                 # Detecteer sensor veranderingen (alleen als game gestart is en niet gepauzeerd)
@@ -546,12 +556,16 @@ class BaseGame(ABC):
                     added, removed = self.detect_changes(current_sensors, self.previous_sensor_state)
                     if added or removed:
                         self.handle_sensor_changes(added, removed)
+                        self.screen_dirty = True  # Herteken bij sensor changes
+                        self.screen_dirty = True
                 
                 # Update previous state
                 self.previous_sensor_state = current_sensors.copy()
                 
-                # Control framerate
-                clock.tick(30)  # 30 FPS
+                # Control framerate - lager voor idle (CPU besparing)
+                # 10 FPS als scherm niet dirty (idle), 30 FPS bij interactie
+                fps = 30 if self.screen_dirty else 10
+                clock.tick(fps)
                 
         except KeyboardInterrupt:
             print("\n\nGame gestopt")
@@ -573,6 +587,7 @@ class BaseGame(ABC):
                 return
             
             self.last_blink_state = blink_on
+            self.screen_dirty = True  # Herteken voor blinking selection indicator
             
             # Bereken legal moves 1x (voorkom herberekening die flikkering veroorzaakt)
             sensor_num = ChessMapper.chess_to_sensor(self.selected_square)
@@ -846,6 +861,7 @@ class BaseGame(ABC):
                 # Reset activity timer (alleen als niet screensaver starting)
                 if not self.screensaver_starting:
                     self.last_activity_time = time.time()
+                self.screen_dirty = True  # Herteken bij keyboard events
                 if event.key == pygame.K_ESCAPE:
                     if self.gui.show_settings:
                         self.gui.show_settings = False
@@ -856,14 +872,17 @@ class BaseGame(ABC):
                 # Reset activity timer (alleen als niet screensaver starting)
                 if not self.screensaver_starting:
                     self.last_activity_time = time.time()
+                self.screen_dirty = True  # Herteken bij mouse events
                 if event.button == 1:  # Left click
                     if not self._handle_mouse_click(event.pos, gui_result):
                         return False  # Exit game
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     self.gui.events.stop_slider_drag()
+                    self.screen_dirty = True
             elif event.type == pygame.MOUSEMOTION:
                 self.gui.events.handle_slider_drag(event.pos, sliders)
+                self.screen_dirty = True  # Herteken bij mouse beweging
         
         return True
     

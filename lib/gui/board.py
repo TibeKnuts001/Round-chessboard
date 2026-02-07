@@ -84,6 +84,39 @@ class BaseBoardRenderer:
                 if selected_square and square_notation == selected_square:
                     self._draw_selection_indicator(col, row)
     
+    def draw_highlights(self, highlighted_squares, selected_square, capture_squares=None):
+        """
+        Teken alleen de highlights/selections bovenop bestaand board
+        Gebruikt voor efficient caching: board grid cached, alleen highlights hertekenen
+        
+        Args:
+            highlighted_squares: List van square notaties voor normale moves
+            selected_square: Notatie van geselecteerd veld of None
+            capture_squares: List van square notaties voor captures (rood)
+        """
+        if capture_squares is None:
+            capture_squares = []
+        
+        for row in range(8):
+            for col in range(8):
+                square_notation = self._get_square_notation(row, col)
+                
+                # Teken overlay alleen als er een highlight is
+                if square_notation in capture_squares or square_notation in highlighted_squares:
+                    # Semi-transparent overlay
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    
+                    if square_notation in capture_squares:
+                        overlay.fill((*self.COLOR_CAPTURE, 128))  # 50% transparency
+                    elif square_notation in highlighted_squares:
+                        overlay.fill((*self.COLOR_HIGHLIGHT, 128))
+                    
+                    self.screen.blit(overlay, (col * self.square_size, row * self.square_size))
+                
+                # Teken selectie indicator
+                if selected_square and square_notation == selected_square:
+                    self._draw_selection_indicator(col, row)
+    
     def _draw_selection_indicator(self, col, row):
         """Teken selectie indicator met knippereffect"""
         blink_on = (pygame.time.get_ticks() // 500) % 2 == 0

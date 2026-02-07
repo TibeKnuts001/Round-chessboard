@@ -144,6 +144,11 @@ class CheckersGUI:
             self.font_small
         )
         
+        # Cached board surface voor betere performance
+        self.cached_board = None
+        self.cached_pieces = None  # Cache voor pieces
+        self.last_board_state = None  # Track board state changes
+        
         self.dialog_renderer = DialogRenderer(
             self.screen,
             self.screen_width,
@@ -177,34 +182,50 @@ class CheckersGUI:
         self.temp_settings = {}
     
     def draw_board(self):
-        """Teken checkers bord"""
-        # Voeg selected square toe aan highlights voor gouden outline
+        """Teken checkers bord - gebruik cache voor betere performance"""
+        # Cache static board grid + coordinaten (alleen eerste keer)
+        if self.cached_board is None:
+            self.cached_board = pygame.Surface((self.board_size, self.board_size))
+            temp_screen = self.screen
+            self.screen = self.cached_board
+            self.board_renderer.screen = self.cached_board
+            
+            # Teken grid en coordinaten op cache (static, 1x)
+            self.board_renderer.draw_board(highlighted_squares={'destinations': [], 'intermediate': []}, last_move=None)
+            if self.settings.get('show_coordinates', True, section='debug'):
+                self.board_renderer.draw_coordinates()
+            
+            self.screen = temp_screen
+            self.board_renderer.screen = temp_screen
+        
+        # Blit cached board (1 blit ipv 64+)
+        self.screen.blit(self.cached_board, (0, 0))
+        
+        # Teken highlights en last move bovenop
         if isinstance(self.highlighted_squares, dict):
             highlights = self.highlighted_squares.copy()
             if self.selected_piece_from:
-                # Voeg selected square toe aan destinations
                 if self.selected_piece_from not in highlights['destinations']:
                     highlights['destinations'] = highlights['destinations'] + [self.selected_piece_from]
         else:
-            # Fallback voor backwards compatibility
             highlights = self.highlighted_squares.copy()
             if self.selected_piece_from:
                 highlights.append(self.selected_piece_from)
         
-        # Geef last move mee voor subtiele highlighting
         last_move = None
         if self.last_move_from and self.last_move_to:
             last_move = (self.last_move_from, self.last_move_to, self.last_move_intermediate)
         
-        self.board_renderer.draw_board(highlighted_squares=highlights, last_move=last_move)
+        # Teken alleen highlights/selection bovenop
+        if highlights or last_move:
+            self.board_renderer.draw_highlights(highlighted_squares=highlights, last_move=last_move)
     
     def draw_coordinates(self):
-        """Teken coordinaten"""
-        if self.settings.get('show_coordinates', True, section='debug'):
-            self.board_renderer.draw_coordinates()
+        """Teken coördinaten - nu in cached board, skip deze call"""
+        pass  # Coordinaten zitten al in cached board
     
     def draw_pieces(self):
-        """Teken checkers pieces"""
+        """Teken checkers pieces - gebruik cache"""
         # Converteer engine board naar format voor BoardRenderer
         board_state = {}
         for row in range(8):
@@ -216,7 +237,24 @@ class CheckersGUI:
                     piece_type = f"{piece.color}_{'king' if piece.is_king else 'man'}"
                     board_state[chess_pos] = piece_type
         
-        self.board_renderer.draw_pieces(board_state)
+        # Check of board veranderd is
+        board_state_key = str(sorted(board_state.items()))
+        if self.last_board_state != board_state_key:
+            # Board changed - maak nieuwe cache
+            self.cached_pieces = pygame.Surface((self.board_size, self.board_size), pygame.SRCALPHA)
+            temp_screen = self.screen
+            self.screen = self.cached_pieces
+            self.board_renderer.screen = self.cached_pieces
+            
+            self.board_renderer.draw_pieces(board_state)
+            
+            self.screen = temp_screen
+            self.board_renderer.screen = temp_screen
+            self.last_board_state = board_state_key
+        
+        # Blit cached pieces
+        if self.cached_pieces:
+            self.screen.blit(self.cached_pieces, (0, 0))
     
     def draw_debug_overlays(self):
         """Teken debug overlays"""
