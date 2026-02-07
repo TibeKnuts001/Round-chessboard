@@ -40,13 +40,15 @@ class CheckersGame(BaseGame):
     
     def _get_setup_steps(self):
         """Checkers-specifieke setup steps - wit en zwart gelijktijdig"""
-        # Checkers: 12 white pieces (rij 1-3) + 12 black pieces (rij 6-8) op dark squares
+        # Checkers: 12 white pieces (rij 1-3) + 12 black pieces (rij 6-8) op DARK squares
+        # Dark squares: A1, C1, E1, G1, B2, D2, F2, H2, A3, C3, E3, G3 (wit)
+        #               B6, D6, F6, H6, A7, C7, E7, G7, B8, D8, F8, H8 (zwart)
         return [
             {
                 'name': 'All pieces', 
-                'squares': ['B1', 'D1', 'F1', 'H1', 'A2', 'C2', 'E2', 'G2', 'B3', 'D3', 'F3', 'H3'],  # White
+                'squares': ['A1', 'C1', 'E1', 'G1', 'B2', 'D2', 'F2', 'H2', 'A3', 'C3', 'E3', 'G3'],  # White - DARK squares
                 'color': (255, 255, 255, 0),
-                'squares_black': ['A6', 'C6', 'E6', 'G6', 'B7', 'D7', 'F7', 'H7', 'A8', 'C8', 'E8', 'G8'],  # Black
+                'squares_black': ['B6', 'D6', 'F6', 'H6', 'A7', 'C7', 'E7', 'G7', 'B8', 'D8', 'F8', 'H8'],  # Black - DARK squares
                 'color_black': (200, 100, 0, 0)
             },
         ]

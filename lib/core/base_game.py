@@ -733,14 +733,14 @@ class BaseGame(ABC):
                                             else:
                                                 self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD - verliezer
                         
-                        # Toon ook laatste zet in dim wit
+                        # Toon ook laatste zet in wit
                         if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from and self.gui.last_move_to:
                             from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
                             to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
                             if from_sensor is not None:
-                                self.leds.set_led(from_sensor, 30, 30, 30, 10)  # Dim wit
+                                self.leds.set_led(from_sensor, 100, 100, 100, 0)  # Wit
                             if to_sensor is not None:
-                                self.leds.set_led(to_sensor, 30, 30, 30, 10)  # Dim wit
+                                self.leds.set_led(to_sensor, 100, 100, 100, 0)  # Wit
                         
                         self.leds.show()
                     else:
@@ -751,9 +751,9 @@ class BaseGame(ABC):
                             from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
                             to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
                             if from_sensor is not None:
-                                self.leds.set_led(from_sensor, 30, 30, 30, 10)  # Dim wit
+                                self.leds.set_led(from_sensor, 100, 100, 100, 0)  # Wit
                             if to_sensor is not None:
-                                self.leds.set_led(to_sensor, 30, 30, 30, 10)  # Dim wit
+                                self.leds.set_led(to_sensor, 100, 100, 100, 0)  # Wit
                         
                         self.leds.show()
                     

@@ -16,7 +16,6 @@ chmod +x chess.sh
 chmod +x checkers.sh
 chmod +x install/install_venv.sh
 chmod +x install/install_splash.sh
-chmod +x install/install_autostart.sh
 chmod +x install/install_launcher.sh
 chmod +x install/install_stockfish.sh
 echo "   ✓ Done"
@@ -47,13 +46,8 @@ echo "4. Installing launcher & desktop icon..."
 ./install/install_launcher.sh
 echo ""
 
-# Installeer autostart
-echo "5. Installing autostart..."
-./install/install_autostart.sh
-echo ""
-
 # Installeer Stockfish
-echo "6. Installing Stockfish chess engine..."
+echo "5. Installing Stockfish chess engine..."
 ./install/install_stockfish.sh
 echo ""
 

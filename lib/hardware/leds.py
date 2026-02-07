@@ -62,6 +62,22 @@ class LEDController:
             white: Wit (0-255)
         """
         if 0 <= led_num < self.led_count:
+            # Compenseer voor lage brightness settings
+            # Als de brightness onder 3% zit, verhoog dan de RGB waarden zodat
+            # het eindresultaat minimaal 3% is
+            current_brightness = self.strip.getBrightness()
+            brightness_factor = current_brightness / 255.0
+            
+            # Als effectieve brightness < 3%, schaal dan de kleuren op
+            MIN_EFFECTIVE_BRIGHTNESS = 0.03  # 3%
+            if brightness_factor < MIN_EFFECTIVE_BRIGHTNESS and brightness_factor > 0:
+                # Bereken schaalfactor om 3% te bereiken
+                scale = MIN_EFFECTIVE_BRIGHTNESS / brightness_factor
+                red = min(255, int(red * scale))
+                green = min(255, int(green * scale))
+                blue = min(255, int(blue * scale))
+                white = min(255, int(white * scale))
+            
             color = (white << 24) | (red << 16) | (green << 8) | blue
             self.strip.setPixelColor(led_num, color)
     

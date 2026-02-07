@@ -28,12 +28,17 @@ After flashing, the SD card will be ejected on macOS.
    
    sudo nano -w /Volumes/bootfs/config.txt
 
-3. Find the line (usually first): dtoverlay=vc4-kms-v3d
-4. Add BELOW it:
+3. Find the line: dtparam=audio=on
+4. Change it to:
+   
+   dtparam=audio=off
+
+5. Find the line (usually first): dtoverlay=vc4-kms-v3d
+6. Add BELOW it:
    
    dtoverlay=vc4-kms-dsi-7inch
 
-5. Save and close (Ctrl+X, Y, Enter)
+7. Save and close (Ctrl+X, Y, Enter)
 
 Note: Leave the [cm5] section untouched - it's for CM5 modules only.
 
