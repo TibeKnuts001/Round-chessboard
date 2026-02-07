@@ -79,7 +79,6 @@ class BaseGame(ABC):
         self.last_blink_state = None  # Track LED blink state om onnodige updates te voorkomen
         self.screen_dirty = True  # Flag: herteken nodig (CPU optimalisatie)
         self.last_gui_result = {}  # Cache laatste gui_result voor button detection
-        self.last_gui_result = {}  # Cache laatste gui_result voor button detection
         
         # LED Animator voor idle effects
         self.led_animator = LEDAnimator(self.leds)
@@ -503,7 +502,7 @@ class BaseGame(ABC):
                         print("Screensaver gestopt (sensor)")
                     self.previous_sensor_state = current_sensors.copy()
                     
-                    clock.tick(30)
+                    clock.tick(15)  # 15 FPS voor screensaver (was 30) - CPU besparing
                     continue  # Skip normale game loop
                 
                 # Normale game loop
