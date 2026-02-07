@@ -238,7 +238,7 @@ class UIWidgets:
         return rect
     
     @staticmethod
-    def draw_button(screen, rect, label, font_small, is_primary=True, is_danger=False):
+    def draw_button(screen, rect, label, font_small, is_primary=True, is_danger=False, disabled=False):
         """
         Teken een standaard button
         
@@ -249,33 +249,38 @@ class UIWidgets:
             font_small: Font voor tekst
             is_primary: Of dit een primary button is (blauwe kleur)
             is_danger: Of dit een danger button is (rode kleur)
+            disabled: Of de button disabled is (grijs, geen hover)
             
         Returns:
             De rect (voor click detection)
         """
         # Button kleur
-        if is_danger:
+        if disabled:
+            color = (100, 100, 100)  # Donkergrijs voor disabled
+        elif is_danger:
             color = (200, 50, 50)  # Rood
         elif is_primary:
             color = UIWidgets.COLOR_BUTTON
         else:
             color = (150, 150, 150)
         
-        # Hover effect
-        mouse_pos = pygame.mouse.get_pos()
-        if rect.collidepoint(mouse_pos):
-            if is_danger:
-                color = (230, 70, 70)  # Lichter rood bij hover
-            elif is_primary:
-                color = UIWidgets.COLOR_BUTTON_HOVER
-            else:
-                color = (180, 180, 180)
+        # Hover effect (alleen als niet disabled)
+        if not disabled:
+            mouse_pos = pygame.mouse.get_pos()
+            if rect.collidepoint(mouse_pos):
+                if is_danger:
+                    color = (230, 70, 70)  # Lichter rood bij hover
+                elif is_primary:
+                    color = UIWidgets.COLOR_BUTTON_HOVER
+                else:
+                    color = (180, 180, 180)
         
         # Draw button
         pygame.draw.rect(screen, color, rect, border_radius=8)
         
-        # Draw text
-        text = font_small.render(label, True, UIWidgets.COLOR_WHITE)
+        # Draw text (grijs als disabled)
+        text_color = (150, 150, 150) if disabled else UIWidgets.COLOR_WHITE
+        text = font_small.render(label, True, text_color)
         text_rect = text.get_rect(center=rect.center)
         screen.blit(text, text_rect)
         

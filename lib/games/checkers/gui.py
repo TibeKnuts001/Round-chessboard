@@ -91,12 +91,21 @@ class CheckersGUI:
         total_button_width = 2 * button_width + button_spacing
         button_start_x = self.board_size + (self.sidebar_width - total_button_width) // 2
         
-        # Eerste rij (New Game - full width)
+        # Eerste rij - dynamisch:
+        # - Voor game: New Game (volle breedte)
+        # - Na game start: Stop Game + Undo (naast elkaar)
         full_button_width = total_button_width
         self.new_game_button = pygame.Rect(
             button_start_x,
             self.screen_height - 130,
-            full_button_width,
+            button_width,  # Altijd normale breedte (voor Stop Game)
+            button_height
+        )
+        
+        self.undo_button = pygame.Rect(
+            button_start_x + button_width + button_spacing,
+            self.screen_height - 130,
+            button_width,
             button_height
         )
         
@@ -121,6 +130,7 @@ class CheckersGUI:
         self.show_new_game_confirm = False
         self.show_stop_game_confirm = False  # Voor stop game confirmation
         self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
+        self.show_undo_confirm = False  # Voor undo confirmation
         self.show_power_dropdown = False
         self.assisted_setup_mode = False
         self.assisted_setup_step = 0
@@ -261,18 +271,14 @@ class CheckersGUI:
         if self.settings.get('debug_sensors', False, section='debug'):
             self.board_renderer.draw_debug_overlays(self.active_sensor_states)
     
-    def draw_sidebar(self):
+    def draw_sidebar(self, game_started=False):
         """Teken sidebar (hergebruikt SidebarRenderer)"""
-        # Haal game_started op van de parent game instance (als die bestaat)
-        game_started = False
-        if hasattr(self, '_game_instance'):
-            game_started = getattr(self._game_instance, 'game_started', False)
-        
         self.sidebar_renderer.draw_sidebar(
             self.engine,
             self.new_game_button,
             self.exit_button,
             self.settings_button,
+            self.undo_button,
             game_started=game_started
         )
     
@@ -305,7 +311,7 @@ class CheckersGUI:
             custom_renderers=custom_renderers
         )
     
-    def draw(self, temp_message=None, temp_message_timer=0):
+    def draw(self, temp_message=None, temp_message_timer=0, game_started=False):
         """
         Main draw method
         
@@ -328,7 +334,7 @@ class CheckersGUI:
             self.draw_coordinates()
         
         # Teken sidebar
-        self.draw_sidebar()
+        self.draw_sidebar(game_started=game_started)
         
         # Dialogs
         result = {}
@@ -350,6 +356,10 @@ class CheckersGUI:
             skip_setup_yes_button, skip_setup_no_button = self.dialog_renderer.draw_skip_setup_step_dialog()
             result['skip_setup_yes'] = skip_setup_yes_button
             result['skip_setup_no'] = skip_setup_no_button
+        elif self.show_undo_confirm:
+            undo_yes_button, undo_no_button = self.dialog_renderer.draw_undo_confirm_dialog()
+            result['undo_yes'] = undo_yes_button
+            result['undo_no'] = undo_no_button
         elif self.show_settings:
             settings_result = self.draw_settings_dialog()
             result.update(settings_result)
@@ -365,7 +375,7 @@ class CheckersGUI:
         
         # Temp message overlay - alleen als GEEN dialogs open zijn
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm):
                 # Kies notification type op basis van message content
                 # Als message een list is, check de eerste regel
                 check_text = temp_message[0] if isinstance(temp_message, list) else temp_message
@@ -373,6 +383,9 @@ class CheckersGUI:
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='error')
                 else:
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='warning')
+        
+        # Voeg undo_button toe aan result
+        result['undo_button'] = self.undo_button
         
         pygame.display.flip()
         return result

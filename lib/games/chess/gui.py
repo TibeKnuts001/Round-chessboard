@@ -95,12 +95,21 @@ class ChessGUI:
         total_button_width = 2 * button_width + button_spacing
         button_start_x = self.board_size + (self.sidebar_width - total_button_width) // 2
         
-        # Eerste rij (New Game - full width)
+        # Eerste rij - dynamisch:
+        # - Voor game: New Game (volle breedte)
+        # - Na game start: Stop Game + Undo (naast elkaar)
         full_button_width = total_button_width
         self.new_game_button = pygame.Rect(
             button_start_x,
             self.screen_height - 130,
-            full_button_width,
+            button_width,  # Altijd normale breedte (voor Stop Game)
+            button_height
+        )
+        
+        self.undo_button = pygame.Rect(
+            button_start_x + button_width + button_spacing,
+            self.screen_height - 130,
+            button_width,
             button_height
         )
         
@@ -125,6 +134,7 @@ class ChessGUI:
         self.show_new_game_confirm = False
         self.show_stop_game_confirm = False  # Voor stop game confirmation
         self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
+        self.show_undo_confirm = False  # Voor undo confirmation
         self.show_power_dropdown = False  # Power profile dropdown open/gesloten
         self.assisted_setup_mode = False  # Assisted setup actief
         self.assisted_setup_step = 0  # Huidige stap in assisted setup
@@ -241,18 +251,14 @@ class ChessGUI:
         if self.settings.get('debug_sensors', False, section='debug'):
             self.board_renderer.draw_debug_overlays(self.active_sensor_states)
     
-    def draw_sidebar(self):
+    def draw_sidebar(self, game_started=False):
         """Teken sidebar"""
-        # Haal game_started op van de parent game instance (als die bestaat)
-        game_started = False
-        if hasattr(self, '_game_instance'):
-            game_started = getattr(self._game_instance, 'game_started', False)
-        
         self.sidebar_renderer.draw_sidebar(
             self.engine,
             self.new_game_button,
             self.exit_button,
             self.settings_button,
+            self.undo_button,
             game_started=game_started
         )
     
@@ -353,7 +359,7 @@ class ChessGUI:
         """
         return self.board_renderer.get_square_from_pos(pos)
     
-    def draw(self, temp_message=None, temp_message_timer=0):
+    def draw(self, temp_message=None, temp_message_timer=0, game_started=False):
         """Teken complete GUI"""
         # Clear screen
         self.screen.fill(self.COLOR_BG)
@@ -369,7 +375,7 @@ class ChessGUI:
         if self.settings.get('show_coordinates', True, section='debug'):
             self.draw_coordinates()
         
-        self.draw_sidebar()
+        self.draw_sidebar(game_started=game_started)
         
         # Teken settings dialog indien nodig
         ok_button = None
@@ -431,10 +437,16 @@ class ChessGUI:
         if self.show_skip_setup_step_confirm:
             skip_setup_yes_button, skip_setup_no_button = self.dialog_renderer.draw_skip_setup_step_dialog()
         
+        # Teken undo confirmation dialog indien nodig
+        undo_yes_button = None
+        undo_no_button = None
+        if self.show_undo_confirm:
+            undo_yes_button, undo_no_button = self.dialog_renderer.draw_undo_confirm_dialog()
+        
         # Teken temp message bovenop alles (als actief en geen dialogs open)
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             # Niet tonen als er een dialog open is
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm):
                 # Parse message: kan string, list of tuple (message, type) zijn
                 if isinstance(temp_message, tuple):
                     message_text, notification_type = temp_message
@@ -462,6 +474,7 @@ class ChessGUI:
             'dropdown_items': dropdown_items if self.show_settings else [],
             'power_profiles': power_profiles if self.show_settings else [],
             'screensaver_button': screensaver_button,
+            'undo_button': self.undo_button,
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,
             'stop_game_yes': stop_game_yes_button,
@@ -470,7 +483,9 @@ class ChessGUI:
             'new_game_assisted': new_game_assisted_button,
             'new_game_cancel': new_game_cancel_button,
             'skip_setup_yes': skip_setup_yes_button,
-            'skip_setup_no': skip_setup_no_button
+            'skip_setup_no': skip_setup_no_button,
+            'undo_yes': undo_yes_button,
+            'undo_no': undo_no_button
         }
     
     def handle_settings_click(self, pos):

@@ -70,11 +70,30 @@ class BaseSidebarRenderer:
         self.screen.blit(title, title_rect)
         return 70  # Start y voor content
     
-    def draw_buttons(self, new_game_button, exit_button, settings_button, game_started=False):
+    def draw_buttons(self, new_game_button, exit_button, settings_button, undo_button=None, game_started=False, can_undo=False):
         """Teken alle control buttons met UIWidgets"""
         # Button text: "Stop Game" als spel bezig is, anders "New Game"
         new_game_text = "Stop Game" if game_started else "New Game"
-        UIWidgets.draw_button(self.screen, new_game_button, new_game_text, self.font_small, is_primary=True)
+        
+        # New Game / Stop Game button
+        # Als game niet gestart: volle breedte
+        # Als game gestart: normale breedte (naast undo)
+        if game_started:
+            # Stop Game button (normale breedte)
+            UIWidgets.draw_button(self.screen, new_game_button, new_game_text, self.font_small, is_primary=True)
+            # Undo button (naast Stop Game)
+            if undo_button:
+                UIWidgets.draw_button(self.screen, undo_button, "Undo", self.font_small, is_primary=False, disabled=not can_undo)
+        else:
+            # New Game button (volle breedte)
+            full_width_rect = pygame.Rect(
+                new_game_button.x,
+                new_game_button.y,
+                new_game_button.width * 2 + 10,  # 2x breedte + spacing
+                new_game_button.height
+            )
+            UIWidgets.draw_button(self.screen, full_width_rect, new_game_text, self.font_small, is_primary=True)
+        
         UIWidgets.draw_button(self.screen, settings_button, "Settings", self.font_small, is_primary=False)
         UIWidgets.draw_button(self.screen, exit_button, "Exit", self.font_small, is_primary=False, is_danger=True)
     

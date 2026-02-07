@@ -224,6 +224,17 @@ class CheckersEngine(BaseEngine):
         
         return False
     
+    def undo_move(self):
+        """Maak laatste zet ongedaan"""
+        try:
+            if self.move_count > 0:
+                self.board.pop()
+                self.move_count -= 1
+                return True
+            return False
+        except:
+            return False
+    
     def is_game_over(self):
         """Check of spel afgelopen is"""
         return self.board.game_over

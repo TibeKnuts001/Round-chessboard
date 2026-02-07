@@ -545,7 +545,7 @@ class BaseGame(ABC):
                 
                 # Draw GUI alleen als screen dirty
                 if self.screen_dirty:
-                    gui_result = self.gui.draw(self.temp_message, self.temp_message_timer)
+                    gui_result = self.gui.draw(self.temp_message, self.temp_message_timer, game_started=self.game_started)
                     pygame.display.flip()
                     self.screen_dirty = False
                     self.last_gui_result = gui_result  # Cache voor volgende frame
@@ -911,9 +911,23 @@ class BaseGame(ABC):
         stop_game_no_button = gui_result.get('stop_game_no')
         skip_setup_yes_button = gui_result.get('skip_setup_yes')
         skip_setup_no_button = gui_result.get('skip_setup_no')
+        undo_yes_button = gui_result.get('undo_yes')
+        undo_no_button = gui_result.get('undo_no')
+        
+        # Undo confirmation dialog
+        if self.gui.show_undo_confirm:
+            if undo_yes_button and undo_yes_button.collidepoint(pos):
+                print("\nUndo confirmed, performing undo...")
+                self._handle_undo()
+                self.gui.show_undo_confirm = False
+                self.screen_dirty = True
+            elif undo_no_button and undo_no_button.collidepoint(pos):
+                print("\nUndo cancelled")
+                self.gui.show_undo_confirm = False
+                self.screen_dirty = True
         
         # Skip setup step confirmation dialog
-        if self.gui.show_skip_setup_step_confirm:
+        elif self.gui.show_skip_setup_step_confirm:
             if self.gui.handle_skip_setup_yes_click(pos, skip_setup_yes_button):
                 print("\nSkipping current setup step...")
                 self._advance_setup_step()
@@ -948,6 +962,9 @@ class BaseGame(ABC):
                 # Forceer LED clear (ook als er geen selectie was)
                 self.leds.clear()
                 self.leds.show()
+                
+                # Forceer screen redraw voor nieuwe button layout
+                self.screen_dirty = True
                 
             elif self.gui.handle_new_game_assisted_click(pos, new_game_assisted_button):
                 print("\nStarting new game (assisted setup)...")
@@ -1068,6 +1085,39 @@ class BaseGame(ABC):
         if self.gui.handle_ok_click(pos, ok_button):
             return
     
+    def _handle_undo(self):
+        """Maak laatste zet(ten) ongedaan"""
+        # Clear selectie eerst
+        self._clear_selection()
+        
+        # Check of VS Computer aan staat
+        vs_computer = self._is_vs_computer_enabled()
+        
+        if vs_computer:
+            # Tegen computer: maak 2 zetten ongedaan (computer + speler)
+            if self.engine.undo_move():
+                print("Undo: Computer zet ongedaan gemaakt")
+                if self.engine.undo_move():
+                    print("Undo: Speler zet ongedaan gemaakt")
+                    self.show_temp_message("Undo: 2 moves back", duration=2000)
+                else:
+                    print("Waarschuwing: Kon speler zet niet ongedaan maken")
+                    self.show_temp_message("Undo: 1 move back", duration=2000)
+            else:
+                print("Geen zetten om ongedaan te maken")
+                self.show_temp_message("No moves to undo", duration=2000)
+        else:
+            # Tegen menselijke speler: maak 1 zet ongedaan
+            if self.engine.undo_move():
+                print("Undo: Laatste zet ongedaan gemaakt")
+                self.show_temp_message("Undo: 1 move back", duration=2000)
+            else:
+                print("Geen zetten om ongedaan te maken")
+                self.show_temp_message("No moves to undo", duration=2000)
+        
+        # Update display
+        self.screen_dirty = True
+    
     def _handle_game_click(self, pos):
         """Handle clicks on game board"""
         # New Game / Stop Game button - disabled tijdens assisted setup
@@ -1083,6 +1133,14 @@ class BaseGame(ABC):
             else:
                 # Toon new game confirmation
                 self.gui.show_new_game_confirm = True
+            return
+        
+        # Undo button - alleen actief als spel gestart is
+        if hasattr(self.gui, 'undo_button') and self.gui.undo_button.collidepoint(pos):
+            if self.game_started:
+                # Toon undo confirmation
+                self.gui.show_undo_confirm = True
+                self._clear_selection()
             return
         
         # Exit button
