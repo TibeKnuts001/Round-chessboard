@@ -169,6 +169,9 @@ class ChessGUI:
         self.board_cache_dirty = True  # Flag om te weten wanneer opnieuw te cachen
         self.last_board_fen = None  # Track board state changes
         
+        # Board surface voor rotatie (virtueel surface voor schaakbord)
+        self.board_surface = pygame.Surface((self.board_size, self.board_size))
+        
         self.sidebar_renderer = ChessSidebarRenderer(
             self.screen,
             self.board_size,
@@ -200,36 +203,40 @@ class ChessGUI:
         
         # Event handlers (delegeer alle click/drag handling)
         self.events = EventHandlers(self)
+        
+        # Detecteer welke kleur rechts staat bij opstarten
+        self.board_renderer.detect_rotated_color(self.engine.get_board())
     
     def draw_board(self):
-        """Teken schaakbord - gebruik cache voor betere performance"""
+        """Teken schaakbord op board_surface voor rotatie"""
         # Cache static board grid + coordinaten (alleen eerste keer)
         if self.cached_board is None:
             self.cached_board = pygame.Surface((self.board_size, self.board_size))
-            temp_screen = self.screen
-            self.screen = self.cached_board
+            temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.cached_board
             
             # Teken grid en coordinaten op cache (static, 1x)
             self.board_renderer.draw_board_grid({}, None, set())
             self.board_renderer.draw_coordinates()
             
-            self.screen = temp_screen
             self.board_renderer.screen = temp_screen
         
-        # Blit cached board (1 blit ipv 64+)
-        self.screen.blit(self.cached_board, (0, 0))
+        # Blit cached board naar board_surface
+        self.board_surface.blit(self.cached_board, (0, 0))
         
-        # Teken highlights bovenop (alleen als nodig)
+        # Teken highlights bovenop board_surface (alleen als nodig)
         if self.highlighted_squares or self.selected_piece_from or self.capture_squares:
+            temp_screen = self.board_renderer.screen
+            self.board_renderer.screen = self.board_surface
             self.board_renderer.draw_highlights(self.highlighted_squares, self.selected_piece_from, self.capture_squares)
+            self.board_renderer.screen = temp_screen
     
     def draw_coordinates(self):
         """Teken coördinaten - nu in cached board, skip deze call"""
         pass  # Coordinaten zitten al in cached board
     
     def draw_pieces(self):
-        """Teken schaakstukken - gebruik cache"""
+        """Teken schaakstukken op board_surface - gebruik cache"""
         current_board = self.engine.get_board()
         current_fen = current_board.fen()
         
@@ -237,24 +244,25 @@ class ChessGUI:
         if self.last_board_fen != current_fen:
             # Board changed - maak nieuwe cache
             self.cached_pieces = pygame.Surface((self.board_size, self.board_size), pygame.SRCALPHA)
-            temp_screen = self.screen
-            self.screen = self.cached_pieces
+            temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.cached_pieces
             
             self.board_renderer.draw_pieces(current_board)
             
-            self.screen = temp_screen
             self.board_renderer.screen = temp_screen
             self.last_board_fen = current_fen
         
-        # Blit cached pieces (alleen als cache bestaat)
+        # Blit cached pieces naar board_surface
         if self.cached_pieces:
-            self.screen.blit(self.cached_pieces, (0, 0))
+            self.board_surface.blit(self.cached_pieces, (0, 0))
     
     def draw_debug_overlays(self):
-        """Teken debug overlays"""
+        """Teken debug overlays op board_surface"""
         if self.settings.get('debug_sensors', False, section='debug'):
+            temp_screen = self.board_renderer.screen
+            self.board_renderer.screen = self.board_surface
             self.board_renderer.draw_debug_overlays(self.active_sensor_states)
+            self.board_renderer.screen = temp_screen
     
     def draw_sidebar(self, game_started=False):
         """Teken sidebar"""
@@ -462,17 +470,25 @@ class ChessGUI:
         # Clear screen
         self.screen.fill(self.COLOR_BG)
         
-        # Teken bord en stukken
+        # Teken bord en stukken op board_surface
         self.draw_board()
         self.draw_pieces()
         
-        # Teken debug overlays (boven pieces)
-        self.draw_debug_overlays()
+        # Teken debug overlays op board_surface (boven pieces)
+        if self.settings.get('debug_sensors', False, section='debug'):
+            temp_screen = self.board_renderer.screen
+            self.board_renderer.screen = self.board_surface
+            self.board_renderer.draw_debug_overlays(self.active_sensor_states)
+            self.board_renderer.screen = temp_screen
         
-        # Teken coördinaten alleen als setting aan staat
-        if self.settings.get('show_coordinates', True, section='debug'):
-            self.draw_coordinates()
+        # Roteer board 90° met de klok mee
+        rotated_board = pygame.transform.rotate(self.board_surface, -90)  # -90 = clockwise
         
+        # Blit geroteerd board naar main screen (gecentreerd)
+        # Na rotatie is board board_size breed en board_size hoog, dus past perfect
+        self.screen.blit(rotated_board, (0, 0))
+        
+        # Teken sidebar (normaal, niet geroteerd)
         self.draw_sidebar(game_started=game_started)
         
         # Teken settings dialog indien nodig

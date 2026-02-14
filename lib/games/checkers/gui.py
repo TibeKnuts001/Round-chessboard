@@ -159,6 +159,9 @@ class CheckersGUI:
         self.cached_pieces = None  # Cache voor pieces
         self.last_board_state = None  # Track board state changes
         
+        # Board surface voor rotatie (virtueel surface voor schaakbord)
+        self.board_surface = pygame.Surface((self.board_size, self.board_size))
+        
         self.dialog_renderer = DialogRenderer(
             self.screen,
             self.screen_width,
@@ -190,14 +193,29 @@ class CheckersGUI:
         
         # Temp settings storage
         self.temp_settings = {}
+        
+        # Detecteer welke kleur rechts staat bij opstarten
+        board_state = self._get_current_board_state()
+        self.board_renderer.detect_rotated_color(board_state)
+    
+    def _get_current_board_state(self):
+        """Helper om huidige board state te krijgen in format voor renderer"""
+        board_state = {}
+        for row in range(8):
+            for col in range(8):
+                chess_pos = f"{chr(65 + col).lower()}{8 - row}"
+                piece = self.engine.get_piece_at(chess_pos.upper())
+                if piece:
+                    piece_type = f"{piece.color}_{'king' if piece.is_king else 'man'}"
+                    board_state[chess_pos] = piece_type
+        return board_state
     
     def draw_board(self):
-        """Teken checkers bord - gebruik cache voor betere performance"""
+        """Teken checkers bord op board_surface voor rotatie"""
         # Cache static board grid + coordinaten (alleen eerste keer)
         if self.cached_board is None:
             self.cached_board = pygame.Surface((self.board_size, self.board_size))
-            temp_screen = self.screen
-            self.screen = self.cached_board
+            temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.cached_board
             
             # Teken grid en coordinaten op cache (static, 1x)
@@ -205,11 +223,10 @@ class CheckersGUI:
             if self.settings.get('show_coordinates', True, section='debug'):
                 self.board_renderer.draw_coordinates()
             
-            self.screen = temp_screen
             self.board_renderer.screen = temp_screen
         
-        # Blit cached board (1 blit ipv 64+)
-        self.screen.blit(self.cached_board, (0, 0))
+        # Blit cached board naar board_surface
+        self.board_surface.blit(self.cached_board, (0, 0))
         
         # Teken highlights en last move bovenop
         if isinstance(self.highlighted_squares, dict):
@@ -226,9 +243,12 @@ class CheckersGUI:
         if self.last_move_from and self.last_move_to:
             last_move = (self.last_move_from, self.last_move_to, self.last_move_intermediate)
         
-        # Teken alleen highlights/selection bovenop
+        # Teken alleen highlights/selection bovenop board_surface
         if highlights or last_move:
+            temp_screen = self.board_renderer.screen
+            self.board_renderer.screen = self.board_surface
             self.board_renderer.draw_highlights(highlighted_squares=highlights, last_move=last_move)
+            self.board_renderer.screen = temp_screen
     
     def draw_coordinates(self):
         """Teken coördinaten - nu in cached board, skip deze call"""
@@ -252,24 +272,25 @@ class CheckersGUI:
         if self.last_board_state != board_state_key:
             # Board changed - maak nieuwe cache
             self.cached_pieces = pygame.Surface((self.board_size, self.board_size), pygame.SRCALPHA)
-            temp_screen = self.screen
-            self.screen = self.cached_pieces
+            temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.cached_pieces
             
             self.board_renderer.draw_pieces(board_state)
             
-            self.screen = temp_screen
             self.board_renderer.screen = temp_screen
             self.last_board_state = board_state_key
         
-        # Blit cached pieces
+        # Blit cached pieces naar board_surface
         if self.cached_pieces:
-            self.screen.blit(self.cached_pieces, (0, 0))
+            self.board_surface.blit(self.cached_pieces, (0, 0))
     
     def draw_debug_overlays(self):
-        """Teken debug overlays"""
+        """Teken debug overlays op board_surface"""
         if self.settings.get('debug_sensors', False, section='debug'):
+            temp_screen = self.board_renderer.screen
+            self.board_renderer.screen = self.board_surface
             self.board_renderer.draw_debug_overlays(self.active_sensor_states)
+            self.board_renderer.screen = temp_screen
     
     def draw_sidebar(self, game_started=False):
         """Teken sidebar (hergebruikt SidebarRenderer)"""
@@ -320,20 +341,22 @@ class CheckersGUI:
         """
         self.screen.fill(self.COLOR_BG)
         
-        # Teken bord
+        # Teken bord op board_surface
         self.draw_board()
         
-        # Teken pieces
+        # Teken pieces op board_surface
         self.draw_pieces()
         
-        # Teken debug overlays
+        # Teken debug overlays op board_surface
         self.draw_debug_overlays()
         
-        # Teken coordinaten
-        if self.settings.get('show_coordinates', True):
-            self.draw_coordinates()
+        # Roteer board 90° met de klok mee
+        rotated_board = pygame.transform.rotate(self.board_surface, -90)  # -90 = clockwise
         
-        # Teken sidebar
+        # Blit geroteerd board naar main screen
+        self.screen.blit(rotated_board, (0, 0))
+        
+        # Teken sidebar (normaal, niet geroteerd)
         self.draw_sidebar(game_started=game_started)
         
         # Dialogs

@@ -20,6 +20,8 @@ class CheckersBoardRenderer(BaseBoardRenderer):
     def __init__(self, screen, board_size, square_size, font_small):
         super().__init__(screen, board_size, square_size, font_small)
         self.piece_images = self._load_piece_images()
+        # Track welke kleur gespiegeld moet worden (rechts na rotatie)
+        self.rotated_color = None
     
     def _get_square_notation(self, row, col):
         """Converteer row/col naar chess notatie (a1-h8, lowercase voor checkers)"""
@@ -47,6 +49,39 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 pieces[piece_type] = surf
         
         return pieces
+    
+    def detect_rotated_color(self, board_state):
+        """
+        Detecteer welke kleur rechts staat (na 90° rotatie = rijen 6,7,8)
+        en stel deze in als rotated_color
+        
+        Args:
+            board_state: Dict met square notatie -> piece type
+        """
+        # Rijen 6,7,8 komen na rotatie rechts te staan
+        white_count = 0
+        black_count = 0
+        
+        for row_num in ['6', '7', '8']:
+            for col_letter in 'abcdefgh':
+                square_notation = f"{col_letter}{row_num}"
+                piece_type = board_state.get(square_notation)
+                if piece_type:
+                    if piece_type.startswith('white'):
+                        white_count += 1
+                    elif piece_type.startswith('black'):
+                        black_count += 1
+        
+        # Stel rotated_color in
+        if white_count > black_count:
+            self.rotated_color = 'white'
+            print(f"Checkers: Detected white on right side - will rotate white pieces 180°")
+        elif black_count > white_count:
+            self.rotated_color = 'black'
+            print(f"Checkers: Detected black on right side - will rotate black pieces 180°")
+        else:
+            self.rotated_color = None
+            print(f"Checkers: No clear color on right - no rotation")
     
     def draw_board(self, highlighted_squares=None, last_move=None):
         """
@@ -199,10 +234,18 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 col = ord(square_notation[0]) - ord('a')
                 row = 8 - int(square_notation[1])
                 
+                # Haal image op
+                image = self.piece_images[piece_type]
+                
+                # Roteer pieces van de kleur die rechts staat 180 graden
+                piece_color = piece_type.split('_')[0]  # 'white' of 'black'
+                if self.rotated_color is not None and piece_color == self.rotated_color:
+                    image = pygame.transform.rotate(image, 180)
+                
                 x = col * self.square_size + 5
                 y = row * self.square_size + 5
                 
-                self.screen.blit(self.piece_images[piece_type], (x, y))
+                self.screen.blit(image, (x, y))
     
     def get_square_from_pos(self, pos):
         """

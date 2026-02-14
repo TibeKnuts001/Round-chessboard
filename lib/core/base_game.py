@@ -105,6 +105,28 @@ class BaseGame(ABC):
         """
         pass
     
+    def _update_rotated_color(self):
+        """
+        Update welke kleur gespiegeld moet worden (rechts na rotatie).
+        Roept game-specifieke detectie aan op board renderer.
+        """
+        if hasattr(self.gui.board_renderer, 'detect_rotated_color'):
+            # Voor chess
+            if hasattr(self.engine, 'get_board'):
+                self.gui.board_renderer.detect_rotated_color(self.engine.get_board())
+            # Voor checkers
+            elif hasattr(self.gui, '_get_current_board_state'):
+                board_state = self.gui._get_current_board_state()
+                self.gui.board_renderer.detect_rotated_color(board_state)
+            
+            # Force piece cache refresh zodat rotatie zichtbaar wordt
+            self.gui.cached_pieces = None
+            if hasattr(self.gui, 'last_board_state'):
+                self.gui.last_board_state = None
+            if hasattr(self.gui, 'last_board_fen'):
+                self.gui.last_board_fen = None
+            self.screen_dirty = True
+    
     @abstractmethod
     def _create_gui(self, engine):
         """
@@ -1093,6 +1115,9 @@ class BaseGame(ABC):
                 self.gui.show_new_game_confirm = False
                 self._clear_selection()
                 
+                # Detecteer welke kleur rechts staat en roteer die
+                self._update_rotated_color()
+                
                 # Stop LED animatie - spel is nu actief
                 self.led_animator.stop()
                 
@@ -1574,6 +1599,9 @@ class BaseGame(ABC):
         self.game_started = True
         self.last_activity_time = time.time()
         self.temp_message = None
+        
+        # Detecteer welke kleur rechts staat en roteer die
+        self._update_rotated_color()
         
         # Clear LEDs
         self.leds.clear()
