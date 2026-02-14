@@ -57,12 +57,14 @@ class CheckersEngine(BaseEngine):
         self.board = AmericanBoard()
         self.selected_square = None
         self.move_count = 0  # Track aantal halve zetten
+        self.move_history = []  # Track moves for undo display
     
     def reset(self):
         """Reset bord naar startpositie"""
         self.board = AmericanBoard()
         self.selected_square = None
         self.move_count = 0
+        self.move_history = []
     
     def get_piece_at(self, chess_notation):
         """
@@ -177,13 +179,14 @@ class CheckersEngine(BaseEngine):
         
         return {'destinations': destinations, 'intermediate': intermediate}
     
-    def make_move(self, from_pos, to_pos):
+    def make_move(self, from_pos, to_pos, promotion=None):
         """
         Voer zet uit
         
         Args:
             from_pos: Van positie (bijv. 'E3')
             to_pos: Naar positie (bijv. 'F4')
+            promotion: Ignored for checkers (only used in chess)
             
         Returns:
             Dict met 'success': bool, 'intermediate': list van intermediate squares (bij multi-captures)
@@ -210,6 +213,9 @@ class CheckersEngine(BaseEngine):
                 self.board.push(move)
                 self.move_count += 1  # Track move count
                 
+                # Track move for history (for undo display)
+                self.move_history.append((from_pos.upper(), to_pos.upper()))
+                
                 # Haal intermediate squares op voor multi-captures
                 intermediate = []
                 if hasattr(move, 'square_list') and len(move.square_list) > 2:
@@ -230,6 +236,8 @@ class CheckersEngine(BaseEngine):
             if self.move_count > 0:
                 self.board.pop()
                 self.move_count -= 1
+                if self.move_history:
+                    self.move_history.pop()
                 return True
             return False
         except:
@@ -323,11 +331,23 @@ class CheckersEngine(BaseEngine):
         Geef laatste zet in leesbare notatie
         
         Returns:
-            String zoals '12-16' of None als geen zetten gedaan
+            String zoals 'E3-F4' of None als geen zetten gedaan
         """
-        # py-draughts AmericanBoard heeft geen move_stack
-        # We kunnen de laatste zet niet ophalen zonder zelf te tracken
+        if self.move_history:
+            from_sq, to_sq = self.move_history[-1]
+            return f"{from_sq}-{to_sq}"
         return None
+    
+    def get_last_move_squares(self):
+        """
+        Geef from/to squares van laatste zet
+        
+        Returns:
+            Tuple (from_square, to_square) in chess notatie, of (None, None)
+        """
+        if self.move_history:
+            return self.move_history[-1]
+        return (None, None)
     
     def get_fen(self):
         """Geef FEN string van huidige positie"""

@@ -124,7 +124,29 @@ class ChessEngine(BaseEngine):
             # Normal move (no promotion)
             move = chess.Move(from_square, to_square)
             if move in self.board.legal_moves:
+                # Check if this is a castling move (king moving 2 squares)
+                is_castling = piece and piece.piece_type == chess.KING and abs(chess.square_file(from_square) - chess.square_file(to_square)) == 2
+                
+                rook_intermediate = []
+                if is_castling:
+                    # Determine rook positions for castling
+                    if chess.square_file(to_square) == 6:  # Kingside (O-O)
+                        rook_from_file = 7
+                        rook_to_file = 5
+                    else:  # Queenside (O-O-O)
+                        rook_from_file = 0
+                        rook_to_file = 3
+                    
+                    rank = chess.square_rank(from_square)
+                    rook_from = chess.square_name(chess.square(rook_from_file, rank)).upper()
+                    rook_to = chess.square_name(chess.square(rook_to_file, rank)).upper()
+                    rook_intermediate = [rook_from, rook_to]
+                
                 self.board.push(move)
+                
+                # Return dict with rook movement for castling
+                if is_castling:
+                    return {'success': True, 'intermediate': rook_intermediate}
                 return True
             return False
         except:
@@ -224,3 +246,41 @@ class ChessEngine(BaseEngine):
             return self.board.san(last_move)
         except:
             return None
+    
+    def get_last_move_squares(self):
+        """
+        Geef from/to squares van laatste zet (inclusief rook bij castling)
+        
+        Returns:
+            Tuple (from_square, to_square, intermediate) in chess notatie
+            intermediate bevat [rook_from, rook_to] bij castling, anders []
+        """
+        try:
+            if len(self.board.move_stack) > 0:
+                last_move = self.board.peek()
+                from_square = chess.square_name(last_move.from_square)
+                to_square = chess.square_name(last_move.to_square)
+                
+                # Check if this was a castling move
+                intermediate = []
+                piece = self.board.piece_at(last_move.to_square)
+                if piece and piece.piece_type == chess.KING:
+                    # Check if king moved 2 squares (castling)
+                    if abs(chess.square_file(last_move.from_square) - chess.square_file(last_move.to_square)) == 2:
+                        # This was castling, calculate rook positions
+                        if chess.square_file(last_move.to_square) == 6:  # Kingside
+                            rook_from_file = 7
+                            rook_to_file = 5
+                        else:  # Queenside
+                            rook_from_file = 0
+                            rook_to_file = 3
+                        
+                        rank = chess.square_rank(last_move.to_square)
+                        rook_from = chess.square_name(chess.square(rook_from_file, rank)).upper()
+                        rook_to = chess.square_name(chess.square(rook_to_file, rank)).upper()
+                        intermediate = [rook_from, rook_to]
+                
+                return (from_square.upper(), to_square.upper(), intermediate)
+            return (None, None, [])
+        except:
+            return (None, None, [])

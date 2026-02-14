@@ -147,6 +147,7 @@ class ChessGUI:
         self.capture_squares = []  # Capture moves (rood)
         self.last_move_from = None  # Voor highlighting van laatste zet
         self.last_move_to = None
+        self.last_move_intermediate = []  # Voor rook positions bij castling
         self.dragging_slider = False
         self.dragging_stockfish_slider = False
         self.selected_piece = None  # Opgepakte stuk (chess.Piece object)
@@ -430,10 +431,10 @@ class ChessGUI:
         self.selected_piece_from = from_square
     
     def set_last_move(self, from_square, to_square, intermediate=None):
-        """Set laatste zet voor highlighting (intermediate parameter voor checkers compatibility)"""
+        """Set laatste zet voor highlighting (inclusief rook positions bij castling)"""
         self.last_move_from = from_square
         self.last_move_to = to_square
-        # Chess gebruikt geen intermediate, maar accepteer parameter voor compatibility
+        self.last_move_intermediate = intermediate if intermediate else []
     
     def update_sensor_debug_states(self, sensor_states):
         """

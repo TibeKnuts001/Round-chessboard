@@ -1257,7 +1257,59 @@ class BaseGame(ABC):
                 print("Geen zetten om ongedaan te maken")
                 self.show_temp_message("No moves to undo", duration=2000)
         
-        # Update display
+        # Clear old last move LEDs first (before updating to new last move)
+        if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from:
+            from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
+            if from_sensor is not None:
+                self.leds.set_led(from_sensor, 0, 0, 0, 0)
+        if hasattr(self.gui, 'last_move_to') and self.gui.last_move_to:
+            to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
+            if to_sensor is not None:
+                self.leds.set_led(to_sensor, 0, 0, 0, 0)
+        if hasattr(self.gui, 'last_move_intermediate'):
+            for inter_pos in self.gui.last_move_intermediate:
+                inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                if inter_sensor is not None:
+                    self.leds.set_led(inter_sensor, 0, 0, 0, 0)
+        
+        # Update last move display to show the new last move (after undo)
+        if hasattr(self.engine, 'get_last_move_squares'):
+            result = self.engine.get_last_move_squares()
+            # Handle both old (2-tuple) and new (3-tuple) return formats
+            from_square = result[0]
+            to_square = result[1]
+            intermediate = result[2] if len(result) > 2 else []
+            
+            if from_square and to_square:
+                # Update GUI with new last move
+                self.gui.set_last_move(from_square, to_square, intermediate)
+                print(f"Updated last move display: {from_square} -> {to_square}")
+                if intermediate:
+                    print(f"  Intermediate (rook): {intermediate}")
+                
+                # Turn on new last move LEDs - koning in dim wit
+                from_sensor = ChessMapper.chess_to_sensor(from_square)
+                to_sensor = ChessMapper.chess_to_sensor(to_square)
+                if from_sensor is not None:
+                    self.leds.set_led(from_sensor, 30, 30, 30, 10)  # Dim wit
+                if to_sensor is not None:
+                    self.leds.set_led(to_sensor, 30, 30, 30, 10)  # Dim wit
+                
+                # Turn on intermediate LEDs - rook in magenta (zoals checkers intermediate)
+                for inter_pos in intermediate:
+                    inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                    if inter_sensor is not None:
+                        self.leds.set_led(inter_sensor, 40, 0, 40, 0)  # Magenta
+            else:
+                # No moves left, clear last move display
+                self.gui.last_move_from = None
+                self.gui.last_move_to = None
+                if hasattr(self.gui, 'last_move_intermediate'):
+                    self.gui.last_move_intermediate = []
+                print("Cleared last move display (no moves left)")
+        
+        # Update LEDs and display
+        self.leds.show()
         self.screen_dirty = True
     
     def _handle_game_click(self, pos):
@@ -1415,6 +1467,9 @@ class BaseGame(ABC):
         remaining_squares = [sq for sq in all_squares if sq not in self.assisted_setup_placed_squares]
         self.gui.highlighted_squares = remaining_squares
         self.gui.capture_squares = []  # No captures during setup
+        
+        # Force screen update
+        self.screen_dirty = True
     
     def _update_assisted_setup_sensors(self):
         """Check sensors during assisted setup and update LEDs"""
@@ -1481,6 +1536,9 @@ class BaseGame(ABC):
                 "White on white LEDs, black on orange LEDs"
             ]
             self.show_temp_message(message, duration=99999)
+            
+            # Force screen update
+            self.screen_dirty = True
         
         # Check of ALLE pieces van deze stap geplaatst zijn - alleen bij toevoegingen checken
         if pieces_added:
@@ -1512,3 +1570,6 @@ class BaseGame(ABC):
         # Clear highlights
         self.gui.highlighted_squares = []
         self.gui.capture_squares = []
+        
+        # Force screen update
+        self.screen_dirty = True
