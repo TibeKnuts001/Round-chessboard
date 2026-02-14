@@ -312,8 +312,9 @@ class BaseGame(ABC):
                 # Onthoud geselecteerd veld
                 self.selected_square = position
             else:
-                print("  Geen legal moves - stuk kan niet geselecteerd worden!")
-                self.show_temp_message("No legal moves for this piece!", duration=2000)
+                # Geen legal moves - waarschijnlijk een vijandelijk stuk dat je wilt capturen
+                # Negeer stil (geen error message) - wacht tot speler eigen stuk oppakt
+                print("  Geen legal moves - negeer (waarschijnlijk vijandelijk stuk)")
         else:
             print("  Geen stuk op deze positie volgens engine")
     
@@ -1315,7 +1316,18 @@ class BaseGame(ABC):
     def _handle_game_click(self, pos):
         """Handle clicks on game board"""
         # New Game / Stop Game button - disabled tijdens assisted setup
-        if self.gui.new_game_button.collidepoint(pos):
+        # Maak hitbox groter als game niet gestart (button is dan volle breedte)
+        new_game_hitbox = self.gui.new_game_button
+        if not self.game_started:
+            # Volle breedte hitbox voor "New Game" button
+            new_game_hitbox = pygame.Rect(
+                self.gui.new_game_button.x,
+                self.gui.new_game_button.y,
+                self.gui.new_game_button.width * 2 + 10,  # 2x breedte + spacing
+                self.gui.new_game_button.height
+            )
+        
+        if new_game_hitbox.collidepoint(pos):
             if self.gui.assisted_setup_mode:
                 # Negeer klik tijdens setup
                 return
