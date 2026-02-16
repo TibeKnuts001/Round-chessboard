@@ -200,7 +200,8 @@ class BaseGame(ABC):
         Vergelijk fysieke board state met engine state
         
         Returns:
-            List van posities waar mismatch is (stuk zou er moeten zijn maar niet gedetecteerd)
+            List van posities waar mismatch is (stuk zou er moeten zijn maar niet gedetecteerd,
+            of stuk staat er maar hoort er niet te zijn)
         """
         mismatches = []
         
@@ -212,6 +213,9 @@ class BaseGame(ABC):
                 
                 # Mismatch: engine heeft stuk, sensor detecteert niets
                 if engine_has_piece and not sensor_has_piece:
+                    mismatches.append(pos)
+                # Mismatch: sensor detecteert stuk, maar engine heeft er geen
+                elif sensor_has_piece and not engine_has_piece:
                     mismatches.append(pos)
         
         return mismatches
@@ -941,7 +945,6 @@ class BaseGame(ABC):
             self.previous_mismatch_positions = []
             self.last_mismatch_blink_state = False  # Reset mismatch blink state
         elif self.board_mismatch_positions:
-            current_sensors = self.read_sensors()
             blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
             
             # Play sound effect when transitioning from off to on
@@ -950,22 +953,22 @@ class BaseGame(ABC):
             
             self.last_mismatch_blink_state = blink_on
             
-            for pos in self.board_mismatch_positions:
-                # Check of magneet NU aanwezig is
-                if current_sensors.get(pos, False):
-                    # Magneet aanwezig: validatie zal volgende frame oplossen, zet uit
+            # Clear LEDs voor posities die niet meer in mismatch list zitten
+            for pos in self.previous_mismatch_positions:
+                if pos not in self.board_mismatch_positions:
                     sensor_num = ChessMapper.chess_to_sensor(pos)
                     if sensor_num is not None:
                         self.leds.set_led(sensor_num, 0, 0, 0, 0)
-                elif blink_on:
-                    # Geen magneet: rood knipperen
-                    sensor_num = ChessMapper.chess_to_sensor(pos)
-                    if sensor_num is not None:
+            
+            # Zet rode LEDs voor huidige mismatches
+            for pos in self.board_mismatch_positions:
+                sensor_num = ChessMapper.chess_to_sensor(pos)
+                if sensor_num is not None:
+                    if blink_on:
+                        # Rood knipperen voor elke mismatch (missing of extra piece)
                         self.leds.set_led(sensor_num, 255, 0, 0, 0)
-                else:
-                    # Uit fase
-                    sensor_num = ChessMapper.chess_to_sensor(pos)
-                    if sensor_num is not None:
+                    else:
+                        # Uit fase
                         self.leds.set_led(sensor_num, 0, 0, 0, 0)
             
             self.leds.show()
