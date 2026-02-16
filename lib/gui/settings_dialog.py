@@ -181,7 +181,7 @@ class SettingsDialog:
             self.screen,
             widget_x,
             y_pos,
-            300,
+            200,
             40,
             current_text,
             is_open,
@@ -204,7 +204,7 @@ class SettingsDialog:
             self.screen,
             widget_x,
             y_pos,
-            300,
+            200,
             brightness,
             0,
             100,
@@ -219,7 +219,7 @@ class SettingsDialog:
             list_y = dropdown_y + 40
             
             for i, (val, text) in enumerate(power_profiles):
-                item_rect = pygame.Rect(widget_x, list_y + i * item_height, 300, item_height)
+                item_rect = pygame.Rect(widget_x, list_y + i * item_height, 200, item_height)
                 is_selected = (val == current_power)
                 dropdown_items.append((val, item_rect, text, is_selected))
         

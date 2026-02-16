@@ -438,7 +438,15 @@ class CheckersGUI:
     
     def get_square_from_pos(self, pos):
         """Converteer mouse pos naar chess notatie (delegates to BoardRenderer)"""
-        return self.board_renderer.get_square_from_pos(pos)
+        # Het bord wordt 90° clockwise gedraaid (-90°) voor weergave
+        # Transformeer de klik positie terug naar originele board coördinaten
+        x_click, y_click = pos
+        
+        # Voor -90° rotatie inverse: origineel = (y, board_size - x)
+        x_board = y_click
+        y_board = self.board_size - x_click
+        
+        return self.board_renderer.get_square_from_pos((x_board, y_board))
     
     # Event handler delegations
     def handle_new_game_click(self, pos):

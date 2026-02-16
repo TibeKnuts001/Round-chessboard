@@ -61,7 +61,7 @@ class ChessSettingsTabs:
         label_width = 140
         label_x = dialog_x + 30
         slider_x = label_x + label_width + 20
-        slider_width = 300
+        slider_width = 200
         
         # Use Worstfish toggle
         worstfish_toggle = UIWidgets.draw_toggle(

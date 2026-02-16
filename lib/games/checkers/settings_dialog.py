@@ -61,7 +61,7 @@ class CheckersSettingsTabs:
         label_width = 140
         label_x = dialog_x + 30
         slider_x = label_x + label_width + 20
-        slider_width = 300
+        slider_width = 200
         
         # Difficulty slider
         diff_label = font_small.render("Difficulty", True, UIWidgets.COLOR_BLACK)

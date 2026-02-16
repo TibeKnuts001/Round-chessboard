@@ -463,7 +463,15 @@ class ChessGUI:
         Returns:
             String zoals "E2" of None als niet op bord geklikt
         """
-        return self.board_renderer.get_square_from_pos(pos)
+        # Het bord wordt 90° clockwise gedraaid (-90°) voor weergave
+        # Transformeer de klik positie terug naar originele board coördinaten
+        x_click, y_click = pos
+        
+        # Voor -90° rotatie inverse: origineel = (y, board_size - x)
+        x_board = y_click
+        y_board = self.board_size - x_click
+        
+        return self.board_renderer.get_square_from_pos((x_board, y_board))
     
     def draw(self, temp_message=None, temp_message_timer=0, game_started=False):
         """Teken complete GUI"""

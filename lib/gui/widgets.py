@@ -51,6 +51,7 @@ class UIWidgets:
         
         # Slider fill (groen)
         normalized = (value - min_val) / (max_val - min_val) if max_val > min_val else 0
+        normalized = max(0.0, min(1.0, normalized))  # Clamp between 0 and 1
         fill_width = int(normalized * width)
         fill_rect = pygame.Rect(x, track_y, fill_width, slider_height)
         pygame.draw.rect(screen, (76, 175, 80), fill_rect, border_radius=4)
@@ -68,7 +69,7 @@ class UIWidgets:
         
         # Text rechts van slider (originele positie: y + 8)
         text_surface = font_small.render(label_text, True, UIWidgets.COLOR_BLACK)
-        screen.blit(text_surface, (x + width + 10, y + 8))
+        screen.blit(text_surface, (x + width + 25, y + 8))
         
         # Interaction area (inclusief knob overflow)
         interaction_rect = pygame.Rect(x - knob_radius, y, width + 2 * knob_radius, interaction_height)

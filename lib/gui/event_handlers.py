@@ -293,6 +293,9 @@ class EventHandlers:
         
         # Calculate new value based on position
         relative_x = pos[0] - slider_start_x
+        # Clamp relative_x to prevent value from going outside bounds
+        relative_x = max(0, min(slider_width, relative_x))
+        
         value_range = max_val - min_val
         value = int((relative_x / slider_width) * value_range) + min_val
         value = max(min_val, min(max_val, value))  # Clamp between min and max
@@ -394,13 +397,13 @@ class EventHandlers:
     def handle_think_time_slider_click(self, pos, slider_rect):
         """Handle think time slider click to start dragging"""
         if self._handle_slider_click(pos, slider_rect, 'think_time'):
-            self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 10000)
+            self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 5000)
             return True
         return False
     
     def handle_think_time_slider_drag(self, pos, slider_rect):
         """Handle think time slider drag"""
-        return self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 10000)
+        return self._handle_slider_drag(pos, slider_rect, 'think_time', 'stockfish_think_time', 500, 5000)
     
     def handle_depth_slider_click(self, pos, slider_rect):
         """Handle depth slider click to start dragging"""
