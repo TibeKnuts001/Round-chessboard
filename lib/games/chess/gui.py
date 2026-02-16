@@ -515,6 +515,7 @@ class ChessGUI:
         dropdown_items = []
         power_profiles = []
         screensaver_button = None
+        test_position_button = None
         if self.show_settings:
             settings_result = self.draw_settings_dialog()
             ok_button = settings_result['ok_button']
@@ -525,6 +526,7 @@ class ChessGUI:
             dropdown_items = settings_result.get('dropdown_items', [])
             power_profiles = settings_result.get('power_profiles', [])
             screensaver_button = settings_result.get('screensaver_button')
+            test_position_button = settings_result.get('test_position_button')
             # Extract individual values for backwards compatibility
             toggle_rect = toggles.get('coordinates')
             debug_toggle_rect = toggles.get('debug_sensors')
@@ -601,6 +603,7 @@ class ChessGUI:
             'dropdown_items': dropdown_items if self.show_settings else [],
             'power_profiles': power_profiles if self.show_settings else [],
             'screensaver_button': screensaver_button,
+            'test_position_button': test_position_button,
             'undo_button': self.undo_button,
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,

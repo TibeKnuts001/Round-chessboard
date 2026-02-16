@@ -314,8 +314,23 @@ class SettingsDialog:
         
         result['screensaver_button'] = screensaver_button
         
-        # Info text
         y_pos += 60
+        
+        # Load Test Position button (alleen voor chess)
+        if hasattr(self.gui, 'engine') and hasattr(self.gui.engine, 'board'):
+            test_position_button_rect = pygame.Rect(button_x, y_pos, button_width, button_height)
+            test_position_button = UIWidgets.draw_button(
+                self.screen,
+                test_position_button_rect,
+                "Load Test Position",
+                self.font_small,
+                is_primary=False
+            )
+            
+            result['test_position_button'] = test_position_button_rect
+            y_pos += 60
+        
+        # Info text
         info_lines = [
             "When enabled, yellow circles with 'M'",
             "(Magnet) appear in the center of squares",

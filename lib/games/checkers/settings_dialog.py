@@ -88,7 +88,7 @@ class CheckersSettingsTabs:
         y_pos += 50
         
         # Think Time slider
-        think_label = font_small.render("Think Time (ms)", True, UIWidgets.COLOR_BLACK)
+        think_label = font_small.render("Think Time (max)", True, UIWidgets.COLOR_BLACK)
         screen.blit(think_label, (label_x, y_pos + 8))
         
         think_time = settings.get('checkers', {}).get('ai_think_time', 1000)

@@ -224,8 +224,7 @@ class EventHandlers:
             'brightness': ('brightness', 0, 100),
             'skill': ('stockfish_skill_level', 0, 20),
             'think_time': ('stockfish_think_time', 500, 10000),
-            'depth': ('stockfish_depth', 5, 25),
-            'threads': ('stockfish_threads', 1, 4),
+            'depth': ('stockfish_depth', 5, 50),
             'ai_difficulty': ('ai_difficulty', 1, 10),
             'ai_think_time': ('ai_think_time', 500, 5000),
         }
@@ -408,24 +407,13 @@ class EventHandlers:
     def handle_depth_slider_click(self, pos, slider_rect):
         """Handle depth slider click to start dragging"""
         if self._handle_slider_click(pos, slider_rect, 'depth'):
-            self._handle_slider_drag(pos, slider_rect, 'depth', 'stockfish_depth', 5, 25)
+            self._handle_slider_drag(pos, slider_rect, 'depth', 'stockfish_depth', 5, 50)
             return True
         return False
     
     def handle_depth_slider_drag(self, pos, slider_rect):
         """Handle depth slider drag"""
-        return self._handle_slider_drag(pos, slider_rect, 'depth', 'stockfish_depth', 5, 25)
-    
-    def handle_threads_slider_click(self, pos, slider_rect):
-        """Handle threads slider click to start dragging"""
-        if self._handle_slider_click(pos, slider_rect, 'threads'):
-            self._handle_slider_drag(pos, slider_rect, 'threads', 'stockfish_threads', 1, 4)
-            return True
-        return False
-    
-    def handle_threads_slider_drag(self, pos, slider_rect):
-        """Handle threads slider drag"""
-        return self._handle_slider_drag(pos, slider_rect, 'threads', 'stockfish_threads', 1, 4)
+        return self._handle_slider_drag(pos, slider_rect, 'depth', 'stockfish_depth', 5, 50)
     
     # Dropdown handlers
     

@@ -104,7 +104,7 @@ class ChessSettingsTabs:
         y_pos += 50
         
         # Think Time slider
-        think_label = font_small.render("Think Time (ms)", True, UIWidgets.COLOR_BLACK)
+        think_label = font_small.render("Think Time (max)", True, UIWidgets.COLOR_BLACK)
         screen.blit(think_label, (label_x, y_pos + 8))
         
         think_time = settings.get('chess', {}).get('stockfish_think_time', 1000)
@@ -137,29 +137,8 @@ class ChessSettingsTabs:
             slider_width,
             depth,
             5,
-            25,
+            50,
             f"{depth}",
             font_small
         )
         result['sliders']['depth'] = depth_slider
-        
-        y_pos += 50
-        
-        # Threads slider
-        threads_label = font_small.render("Threads", True, UIWidgets.COLOR_BLACK)
-        screen.blit(threads_label, (label_x, y_pos + 8))
-        
-        threads = settings.get('chess', {}).get('stockfish_threads', 1)
-        
-        threads_slider = UIWidgets.draw_slider(
-            screen,
-            slider_x,
-            y_pos,
-            slider_width,
-            threads,
-            1,
-            4,
-            f"{threads}",
-            font_small
-        )
-        result['sliders']['threads'] = threads_slider

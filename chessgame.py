@@ -60,7 +60,7 @@ class ChessGame(BaseGame):
             # Normale Stockfish: gebruik instellingen
             print("Using Stockfish (strong AI)")
             skill = self.gui.settings.get('stockfish_skill_level', 10, section='chess')
-            threads = self.gui.settings.get('stockfish_threads', 1, section='chess')
+            threads = 4  # Altijd 4 threads gebruiken
             depth = self.gui.settings.get('stockfish_depth', 15, section='chess')
             stockfish = StockfishEngine(skill_level=skill, threads=threads, depth=depth)
         
@@ -85,7 +85,7 @@ class ChessGame(BaseGame):
         # Update Stockfish settings voor deze zet (in geval settings zijn gewijzigd)
         if not use_worstfish:
             current_skill = self.gui.settings.get('stockfish_skill_level', 10, section='chess')
-            current_threads = self.gui.settings.get('stockfish_threads', 1, section='chess')
+            current_threads = 4  # Altijd 4 threads gebruiken
             current_depth = self.gui.settings.get('stockfish_depth', 15, section='chess')
             self.ai.update_settings(
                 skill_level=current_skill,
@@ -212,7 +212,7 @@ class ChessGame(BaseGame):
         vs_computer_enabled = self.gui.settings.get('play_vs_computer', False, section='chess')
         use_worstfish = self.gui.settings.get('use_worstfish', False, section='chess')
         stockfish_skill = self.gui.settings.get('stockfish_skill_level', 10, section='chess')
-        stockfish_threads = self.gui.settings.get('stockfish_threads', 1, section='chess')
+        stockfish_threads = 4  # Altijd 4 threads gebruiken
         stockfish_depth = self.gui.settings.get('stockfish_depth', 15, section='chess')
         
         # Check of worstfish/stockfish mode is gewisseld
