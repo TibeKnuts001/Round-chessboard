@@ -147,12 +147,27 @@ class ChessGame(BaseGame):
             
             print(f"Computer zet: {from_square} -> {to_square}")
             
+            # Count pieces before move to detect captures
+            pieces_before = self.count_pieces()
+            
             # Maak de zet
             self.engine.board.push(best_move)
+            
+            # Check if a piece was captured (piece count decreased)
+            pieces_after = self.count_pieces()
+            if pieces_after < pieces_before:
+                self.sound_manager.play_capture()
             
             # Check game status
             if self.engine.is_game_over():
                 print(f"\n*** {self.engine.get_game_result()} ***\n")
+                # Play checkmate sound
+                if self.engine.is_checkmate():
+                    self.sound_manager.play_checkmate()
+            else:
+                # Check for check
+                if self.engine.is_in_check():
+                    self.sound_manager.play_check()
     
     def _draw_thinking_indicator(self, frame):
         """Teken thinking indicator overlay"""

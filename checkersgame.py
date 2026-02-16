@@ -81,9 +81,17 @@ class CheckersGame(BaseGame):
         if best_move:
             # Voer zet uit
             try:
+                # Count pieces before move to detect captures
+                pieces_before = self.count_pieces()
+                
                 self.engine.board.push(best_move)
                 self.engine.move_count += 1  # Track move count
                 print(f"AI speelt: {best_move}")
+                
+                # Check if a piece was captured (piece count decreased)
+                pieces_after = self.count_pieces()
+                if pieces_after < pieces_before:
+                    self.sound_manager.play_capture()
             except Exception as e:
                 print(f"Fout bij AI zet: {e}")
         else:

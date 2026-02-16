@@ -35,6 +35,7 @@ from lib.hardware.mapping import ChessMapper  # TODO: Hernoemen naar BoardMapper
 from lib.settings import Settings
 from lib.effects.led_animations import LEDAnimator
 from lib.gui.screensaver import Screensaver
+from lib.audio.sound_manager import SoundManager
 
 
 class BaseGame(ABC):
@@ -78,6 +79,7 @@ class BaseGame(ABC):
         self.temp_message = None  # Tijdelijke berichten
         self.temp_message_timer = 0  # Wanneer bericht verdwijnt
         self.last_blink_state = None  # Track LED blink state om onnodige updates te voorkomen
+        self.last_mismatch_blink_state = False  # Track mismatch blink state voor sound effect
         self.screen_dirty = True  # Flag: herteken nodig (CPU optimalisatie)
         self.last_gui_result = {}  # Cache laatste gui_result voor button detection
         
@@ -92,6 +94,9 @@ class BaseGame(ABC):
         self.screensaver_start_time = 0
         self.last_activity_time = time.time()
         self.screensaver_timeout = 60.0  # 1 minuut
+        
+        # Sound Manager voor game sound effects
+        self.sound_manager = SoundManager(self.gui.settings)
         
         print(f"{self.__class__.__name__} klaar!")
     
@@ -210,6 +215,21 @@ class BaseGame(ABC):
                     mismatches.append(pos)
         
         return mismatches
+    
+    def count_pieces(self):
+        """
+        Tel totaal aantal stukken op het bord
+        
+        Returns:
+            int: Totaal aantal stukken
+        """
+        count = 0
+        for row in range(8):
+            for col in range(8):
+                pos = f"{chr(65 + col)}{8 - row}"
+                if self.engine.get_piece_at(pos) is not None:
+                    count += 1
+        return count
     
     def detect_changes(self, current_state, previous_state):
         """
@@ -363,6 +383,9 @@ class BaseGame(ABC):
                     
                     # Show warning message
                     self.show_temp_message("Cannot return piece - Touch-move rule!", duration=2000)
+                    
+                    # Play mismatch sound for touch-move violation
+                    self.sound_manager.play_mismatch()
                     return
                 else:
                     print(f"  Stuk teruggeplaatst op originele positie - deselecteer")
@@ -376,6 +399,9 @@ class BaseGame(ABC):
                     # Reset selectie
                     self.selected_square = None
                     return
+            
+            # Count pieces before move to detect captures
+            pieces_before = self.count_pieces()
             
             # Probeer zet te maken
             move_result = self.engine.make_move(self.selected_square, position, promotion=getattr(self.gui, 'promotion_choice', None))
@@ -426,10 +452,22 @@ class BaseGame(ABC):
                 # Reset selectie
                 self.selected_square = None
                 
+                # Check if a piece was captured (piece count decreased)
+                pieces_after = self.count_pieces()
+                if pieces_after < pieces_before:
+                    self.sound_manager.play_capture()
+                
                 # Check game status
                 if self.engine.is_game_over():
                     print(f"\n*** {self.engine.get_game_result()} ***\n")
+                    # Play checkmate sound
+                    if hasattr(self.engine, 'is_checkmate') and self.engine.is_checkmate():
+                        self.sound_manager.play_checkmate()
                 else:
+                    # Check for check
+                    if hasattr(self.engine, 'is_in_check') and self.engine.is_in_check():
+                        self.sound_manager.play_check()
+                    
                     # Als VS Computer aan staat, laat computer zet doen
                     if self._is_vs_computer_enabled() and self.ai:
                         # Eerst GUI hertekenen met player move
@@ -446,6 +484,8 @@ class BaseGame(ABC):
                         self.make_computer_move()
             else:
                 print(f"  Ongeldige zet: {self.selected_square} -> {position}")
+                # Play mismatch sound for invalid move
+                self.sound_manager.play_mismatch()
     
     def show_temp_message(self, message, duration=2000):
         """Toon tijdelijk bericht op scherm"""
@@ -899,9 +939,16 @@ class BaseGame(ABC):
             
             self.leds.show()
             self.previous_mismatch_positions = []
+            self.last_mismatch_blink_state = False  # Reset mismatch blink state
         elif self.board_mismatch_positions:
             current_sensors = self.read_sensors()
             blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
+            
+            # Play sound effect when transitioning from off to on
+            if blink_on and not self.last_mismatch_blink_state:
+                self.sound_manager.play_mismatch()
+            
+            self.last_mismatch_blink_state = blink_on
             
             for pos in self.board_mismatch_positions:
                 # Check of magneet NU aanwezig is
@@ -923,31 +970,6 @@ class BaseGame(ABC):
             
             self.leds.show()
             self.previous_mismatch_positions = self.board_mismatch_positions.copy()
-        
-        # Board validation: rood knipperen voor mismatches (altijd checken)
-        if self.board_mismatch_positions:
-            current_sensors = self.read_sensors()
-            blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
-            
-            for pos in self.board_mismatch_positions:
-                # Check of magneet NU aanwezig is
-                if current_sensors.get(pos, False):
-                    # Magneet aanwezig: validatie zal volgende frame oplossen, zet uit
-                    sensor_num = ChessMapper.chess_to_sensor(pos)
-                    if sensor_num is not None:
-                        self.leds.set_led(sensor_num, 0, 0, 0, 0)
-                elif blink_on:
-                    # Geen magneet: rood knipperen
-                    sensor_num = ChessMapper.chess_to_sensor(pos)
-                    if sensor_num is not None:
-                        self.leds.set_led(sensor_num, 255, 0, 0, 0)
-                else:
-                    # Uit fase
-                    sensor_num = ChessMapper.chess_to_sensor(pos)
-                    if sensor_num is not None:
-                        self.leds.set_led(sensor_num, 0, 0, 0, 0)
-            
-            self.leds.show()
     
     def _handle_events(self, gui_result):
         """

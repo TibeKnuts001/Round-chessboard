@@ -60,6 +60,7 @@ class Settings:
         },
         'general': {
             'screensaver_audio': True,  # Muziek tijdens screensaver
+            'sound_effects': True,  # Game sound effects (check, checkmate, mismatch)
         },
         'debug': {
             'show_coordinates': True,
