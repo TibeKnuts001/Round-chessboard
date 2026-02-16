@@ -34,11 +34,24 @@ After flashing, the SD card will be ejected on macOS.
    dtparam=audio=off
 
 5. Find the line (usually first): dtoverlay=vc4-kms-v3d
-6. Add BELOW it:
+
+6. Add BELOW the vc4-kms-v3d line:
    
    dtoverlay=vc4-kms-dsi-7inch
 
-7. Save and close (Ctrl+X, Y, Enter)
+FOR RASPBERRY PI 3 ONLY:
+7. Change the line: dtoverlay=vc4-kms-v3d
+   To:
+   
+   dtoverlay=vc4-fkms-v3d
+
+8. Add these additional lines (for RPi 3):
+   
+   enable_tvout=0
+   dtparam=i2c_vc=on
+   dtparam=i2c_vc_baudrate=50000
+
+9. Save and close (Ctrl+X, Y, Enter)
 
 Note: Leave the [cm5] section untouched - it's for CM5 modules only.
 

@@ -23,31 +23,32 @@ echo "Starting ${APP_NAME} game..."
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check if we need to re-exec with sudo for /dev/mem access
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "LED hardware requires sudo access to /dev/mem"
-  echo "Restarting with sudo (preserving user environment for audio/display)..."
-  
-  # Get the real user info before becoming root
-  REAL_USER="${SUDO_USER:-$(id -un)}"
-  REAL_UID="${SUDO_UID:-$(id -u)}"
-  
-  # Re-execute this script with sudo, preserving environment
-  exec sudo -E \
-    REAL_USER="$REAL_USER" \
-    REAL_UID="$REAL_UID" \
-    "$0" "$@"
-fi
+# Get current user info
+CURRENT_USER="$(id -un)"
+CURRENT_UID="$(id -u)"
 
-# Now we're running as root, but we need to preserve user's audio/display environment
-REAL_USER="${REAL_USER:-root}"
-REAL_UID="${REAL_UID:-0}"
-
-echo "Running as: $(id -un)  UID: $(id -u)"
-echo "Real user: $REAL_USER  UID: $REAL_UID"
+echo "Running as: $CURRENT_USER  UID: $CURRENT_UID"
 
 # Zet user runtime dir (nodig voor PipeWire/Pulse compat sockets)
-export XDG_RUNTIME_DIR="/run/user/${REAL_UID}"
+export XDG_RUNTIME_DIR="/run/user/${CURRENT_UID}"
+
+# Zet DISPLAY als het niet al ingesteld is (voor SSH sessies)
+if [[ -z "${DISPLAY:-}" ]]; then
+  echo "DISPLAY not set, detecting..."
+  # Probeer :0 (standaard voor lokaal scherm op Pi)
+  if [[ -S "/tmp/.X11-unix/X0" ]]; then
+    export DISPLAY=:0
+    echo "DISPLAY set to :0"
+  elif [[ -S "/tmp/.X11-unix/X1" ]]; then
+    export DISPLAY=:1
+    echo "DISPLAY set to :1"
+  else
+    echo "WARNING: No X11 socket found, trying :0 anyway"
+    export DISPLAY=:0
+  fi
+else
+  echo "DISPLAY already set: $DISPLAY"
+fi
 
 # Zorg dat DBus user bus klopt (veel desktop audio routing hangt hier indirect van af)
 if [[ -S "${XDG_RUNTIME_DIR}/bus" ]]; then
@@ -75,10 +76,16 @@ fi
 
 echo "Python: $PYTHON"
 echo "PWD: $(pwd)"
+echo "DISPLAY=$DISPLAY"
 echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
 echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-"(not set)"}"
 
-# Running as root now, so we have direct /dev/mem access for LED hardware
-echo "✓ Running with sudo - /dev/mem access available"
+# Geef toegang tot X11 display (voor SSH sessies)
+if command -v xhost >/dev/null 2>&1; then
+  xhost +local: >/dev/null 2>&1 || true
+fi
+
+echo ""
+echo "Starting game as user (requires /dev/mem access for LEDs)..."
 
 exec "$PYTHON" "$PY_FILE"

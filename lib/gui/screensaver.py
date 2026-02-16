@@ -4,12 +4,57 @@ Screensaver Module
 
 Displays static splash screen with animated overlay effects.
 Features particles, color waves, and scanlines.
+Animations only on Raspberry Pi 4 or higher (performance).
 """
 
 import pygame
 import math
 import os
 import random
+
+
+def get_raspberry_pi_version():
+    """Detecteer Raspberry Pi versie (retourneert 3, 4, 5, etc. of 0 voor onbekend)"""
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            cpuinfo = f.read()
+            
+            # Extract model info
+            for line in cpuinfo.split('\n'):
+                if line.startswith('Model'):
+                    model_info = line.split(':', 1)[1].strip()
+                    print(f"[SCREENSAVER DEBUG] Gedetecteerd bord: {model_info}")
+                    
+                    # Bepaal versie nummer
+                    if 'Raspberry Pi 5' in model_info:
+                        version = 5
+                    elif 'Raspberry Pi 4' in model_info:
+                        version = 4
+                    elif 'Raspberry Pi 3' in model_info:
+                        version = 3
+                    elif 'Raspberry Pi 2' in model_info:
+                        version = 2
+                    elif 'Raspberry Pi' in model_info:
+                        version = 1
+                    else:
+                        version = 0
+                    
+                    if version >= 4:
+                        print(f"[SCREENSAVER DEBUG] → Pi {version}: Animaties ENABLED")
+                    else:
+                        print(f"[SCREENSAVER DEBUG] → Pi {version}: Animaties DISABLED (statisch beeld)")
+                    
+                    return version
+            
+            return 0
+    except Exception as e:
+        print(f"[SCREENSAVER DEBUG] Fout bij detectie: {e}, veronderstel oudere Pi")
+        return 0
+
+
+# Detecteer Pi versie globaal
+PI_VERSION = get_raspberry_pi_version()
+ENABLE_ANIMATIONS = PI_VERSION >= 4  # Alleen Pi 4 en hoger
 
 
 class Particle:
@@ -71,17 +116,26 @@ class Screensaver:
         # Center and scale splash image to fit screen nicely
         self.splash_rect = self.splash_image.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
         
-        # Animation state
-        self.time = 0.0
-        self.animation_speed = 1.0
+        # Check of animaties enabled zijn (alleen Pi 4+)
+        self.animations_enabled = ENABLE_ANIMATIONS
         
-        # Floating particles - subtiel
-        self.particles = [Particle(self.screen_width, self.screen_height) for _ in range(100)]
-        
-        # Scanline position and timing
-        self.scanline_x = -self.screen_height  # Start offscreen left
-        self.scanline_waiting = True
-        self.next_scanline_time = 15.0  # Wait 15 seconds before first scanline
+        # Animation state (alleen als enabled)
+        if self.animations_enabled:
+            self.time = 0.0
+            self.animation_speed = 1.0
+            
+            # Floating particles - subtiel
+            self.particles = [Particle(self.screen_width, self.screen_height) for _ in range(100)]
+            
+            # Scanline position and timing
+            self.scanline_x = -self.screen_height  # Start offscreen left
+            self.scanline_waiting = True
+            self.next_scanline_time = 15.0  # Wait 15 seconds before first scanline
+        else:
+            # Geen animaties - alleen statisch beeld
+            self.time = 0.0
+            self.particles = []
+            print("[SCREENSAVER] Statische modus (geen animaties)")
         
         # Audio
         self.audio_playing = False
@@ -120,6 +174,10 @@ class Screensaver:
         Args:
             dt: Delta time since last frame (seconds)
         """
+        # Skip updates als animaties niet enabled zijn
+        if not self.animations_enabled:
+            return
+        
         self.time += dt * self.animation_speed
         
         # Update particles
@@ -149,20 +207,22 @@ class Screensaver:
         # Black background
         self.screen.fill((0, 0, 0))
         
-        # Draw static splash image (centered, no movement)
+        # Draw static splash image (centered, no movement) - ALTIJD
         self.screen.blit(self.splash_image, self.splash_rect)
         
-        # Effect 1: Floating particles
-        self._draw_particles()
-        
-        # Effect 2: Color wave overlay
-        self._draw_color_wave()
-        
-        # Effect 3: Pulsing corner glow
-        self._draw_corner_glow()
-        
-        # Effect 4: Scanline sweep (drawn last so it's on top)
-        self._draw_scanline()
+        # Alleen animaties tekenen als enabled (Pi 4+)
+        if self.animations_enabled:
+            # Effect 1: Floating particles
+            self._draw_particles()
+            
+            # Effect 2: Color wave overlay
+            self._draw_color_wave()
+            
+            # Effect 3: Pulsing corner glow
+            self._draw_corner_glow()
+            
+            # Effect 4: Scanline sweep (drawn last so it's on top)
+            self._draw_scanline()
     
     def _draw_particles(self):
         """Draw floating particles"""

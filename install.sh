@@ -18,6 +18,7 @@ chmod +x install/install_venv.sh
 chmod +x install/install_splash.sh
 chmod +x install/install_launcher.sh
 chmod +x install/install_stockfish.sh
+chmod +x install/install_mem_access.sh
 echo "   ✓ Done"
 echo ""
 
@@ -51,11 +52,17 @@ echo "5. Installing Stockfish chess engine..."
 ./install/install_stockfish.sh
 echo ""
 
+# Setup /dev/mem toegang voor LED hardware
+echo "6. Setting up /dev/mem access for LED hardware..."
+./install/install_mem_access.sh
+echo ""
+
 echo "╔════════════════════════════════════════╗"
 echo "║         Installation Complete!         ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
 echo "Next steps:"
+echo "  • LOGOUT and LOGIN again (for group permissions)"
 echo "  • Start the game: ./run.sh"
 echo ""
 echo "The chess game will now start automatically after reboot!"

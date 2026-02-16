@@ -506,6 +506,10 @@ class BaseGame(ABC):
                         self.screensaver.stop_audio()
                         self.screensaver_active = False
                         self.screensaver_starting = False
+                        # Force een volledige redraw van de game UI
+                        self.screen_dirty = True
+                        self.gui.draw(self.temp_message, self.temp_message_timer, game_started=self.game_started)
+                        pygame.display.flip()
                         print("Screensaver gestopt (game actief)")
                 
                 # Screensaver mode - simplified rendering
@@ -527,6 +531,10 @@ class BaseGame(ABC):
                             self.screensaver.stop_audio()
                             self.screensaver_active = False
                             self.last_activity_time = current_time
+                            # Force een volledige redraw van de game UI
+                            self.screen_dirty = True
+                            self.gui.draw(self.temp_message, self.temp_message_timer, game_started=self.game_started)
+                            pygame.display.flip()
                             print("Screensaver gestopt (touch)")
                     
                     # Check sensor changes om screensaver te stoppen
@@ -536,6 +544,10 @@ class BaseGame(ABC):
                         self.screensaver.stop_audio()
                         self.screensaver_active = False
                         self.last_activity_time = current_time
+                        # Force een volledige redraw van de game UI
+                        self.screen_dirty = True
+                        self.gui.draw(self.temp_message, self.temp_message_timer, game_started=self.game_started)
+                        pygame.display.flip()
                         print("Screensaver gestopt (sensor)")
                     self.previous_sensor_state = current_sensors.copy()
                     
