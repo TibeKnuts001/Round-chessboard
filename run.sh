@@ -18,20 +18,36 @@ case "$APP_NAME" in
 esac
 
 echo "Starting ${APP_NAME} game..."
-echo "User: $(id -un)  UID: $(id -u)"
 
 # Ga naar de directory van deze run.sh (zodat assets/ paden kloppen)
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Zorg dat we NIET als root draaien (root mist vaak user audio session)
-if [[ "$(id -u)" -eq 0 ]]; then
-  echo "ERROR: Do not run this script as root/sudo (PipeWire/BT audio will fail)."
-  exit 1
+# Check if we need to re-exec with sudo for /dev/mem access
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "LED hardware requires sudo access to /dev/mem"
+  echo "Restarting with sudo (preserving user environment for audio/display)..."
+  
+  # Get the real user info before becoming root
+  REAL_USER="${SUDO_USER:-$(id -un)}"
+  REAL_UID="${SUDO_UID:-$(id -u)}"
+  
+  # Re-execute this script with sudo, preserving environment
+  exec sudo -E \
+    REAL_USER="$REAL_USER" \
+    REAL_UID="$REAL_UID" \
+    "$0" "$@"
 fi
 
+# Now we're running as root, but we need to preserve user's audio/display environment
+REAL_USER="${REAL_USER:-root}"
+REAL_UID="${REAL_UID:-0}"
+
+echo "Running as: $(id -un)  UID: $(id -u)"
+echo "Real user: $REAL_USER  UID: $REAL_UID"
+
 # Zet user runtime dir (nodig voor PipeWire/Pulse compat sockets)
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export XDG_RUNTIME_DIR="/run/user/${REAL_UID}"
 
 # Zorg dat DBus user bus klopt (veel desktop audio routing hangt hier indirect van af)
 if [[ -S "${XDG_RUNTIME_DIR}/bus" ]]; then
@@ -62,19 +78,7 @@ echo "PWD: $(pwd)"
 echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
 echo "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-"(not set)"}"
 
-# Optioneel: SDL audio driver niet forceren, laat SDL zelf kiezen (werkt vaak best)
-# Als je ooit wél wil forceren naar pulse-compat:
-# export SDL_AUDIODRIVER="pulseaudio"
-
-# Fix /dev/mem permissions voor LED hardware (ws2811)
-if [[ -e /dev/mem ]]; then
-  CURRENT_PERMS=$(stat -c "%a" /dev/mem 2>/dev/null || stat -f "%Lp" /dev/mem 2>/dev/null)
-  if [[ "$CURRENT_PERMS" != "777" ]]; then
-    echo "Fixing /dev/mem permissions (current: $CURRENT_PERMS, need: 777)"
-    sudo chmod 777 /dev/mem
-  else
-    echo "✓ /dev/mem permissions OK ($CURRENT_PERMS)"
-  fi
-fi
+# Running as root now, so we have direct /dev/mem access for LED hardware
+echo "✓ Running with sudo - /dev/mem access available"
 
 exec "$PYTHON" "$PY_FILE"

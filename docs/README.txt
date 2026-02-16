@@ -14,7 +14,7 @@ This project uses VS Code SFTP sync to automatically upload files to the Raspber
    - Edit .vscode/sftp.json
    - Change "host" to your Raspberry Pi's IP address
    - Change "username" if needed (default: tibe)
-   - Change "remotePath" if needed (default: /home/tibe/chess)
+   - The "remotePath" automatically uses /home/${username}/chess
 
 3. Auto-Upload:
    - Files are automatically uploaded to the Pi when you save (Cmd+S)

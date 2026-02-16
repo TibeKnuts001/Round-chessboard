@@ -82,6 +82,17 @@ class ChessGame(BaseGame):
         ai_name = "Worstfish" if use_worstfish else "Stockfish"
         print(f"\n{ai_name} denkt...")
         
+        # Update Stockfish settings voor deze zet (in geval settings zijn gewijzigd)
+        if not use_worstfish:
+            current_skill = self.gui.settings.get('stockfish_skill_level', 10, section='chess')
+            current_threads = self.gui.settings.get('stockfish_threads', 1, section='chess')
+            current_depth = self.gui.settings.get('stockfish_depth', 15, section='chess')
+            self.ai.update_settings(
+                skill_level=current_skill,
+                threads=current_threads,
+                depth=current_depth
+            )
+        
         # Threading voor async Stockfish berekening
         thinking_done = False
         best_move = None

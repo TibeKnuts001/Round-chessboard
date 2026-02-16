@@ -85,7 +85,13 @@ class StockfishEngine:
             self._send_command("uci")
             self._wait_for("uciok")
             
-            # Stel skill level in
+            # Stel skill level in (0-20)
+            # Skill 20 = max sterkte, UCI_LimitStrength MOET uit
+            # Skill 0-19 = beperkte sterkte, UCI_LimitStrength MOET aan
+            if self.skill_level == 20:
+                self._send_command("setoption name UCI_LimitStrength value false")
+            else:
+                self._send_command("setoption name UCI_LimitStrength value true")
             self._send_command(f"setoption name Skill Level value {self.skill_level}")
             
             # Stel threads in
@@ -112,6 +118,46 @@ class StockfishEngine:
         except Exception as e:
             print(f"ERROR bij starten Stockfish: {e}")
             self.process = None
+    
+    def update_settings(self, skill_level=None, threads=None, depth=None):
+        """
+        Update Stockfish settings dynamisch
+        
+        Args:
+            skill_level: Nieuwe skill level (0-20)
+            threads: Aantal threads (1-4)
+            depth: Zoekdiepte (5-25)
+        """
+        if not self.process:
+            print("Stockfish niet actief - kan settings niet updaten")
+            return
+        
+        # Update skill level
+        if skill_level is not None and skill_level != self.skill_level:
+            self.skill_level = skill_level
+            # Skill 20 = max sterkte (limitstrength UIT), 0-19 = beperkt (limitstrength AAN)
+            if self.skill_level == 20:
+                self._send_command("setoption name UCI_LimitStrength value false")
+            else:
+                self._send_command("setoption name UCI_LimitStrength value true")
+            self._send_command(f"setoption name Skill Level value {self.skill_level}")
+            print(f"Stockfish skill level updated to {self.skill_level} (LimitStrength={'off' if self.skill_level == 20 else 'on'})")
+        
+        # Update threads
+        if threads is not None and threads != self.threads:
+            self.threads = threads
+            self._send_command(f"setoption name Threads value {self.threads}")
+            print(f"Stockfish threads updated to {self.threads}")
+        
+        # Update depth (wordt gebruikt bij volgende get_best_move)
+        if depth is not None and depth != self.depth:
+            self.depth = depth
+            print(f"Stockfish depth updated to {self.depth}")
+        
+        # Wacht tot engine klaar is
+        if skill_level is not None or threads is not None:
+            self._send_command("isready")
+            self._wait_for("readyok")
     
     def _send_command(self, command):
         """Stuur command naar Stockfish"""
@@ -148,19 +194,44 @@ class StockfishEngine:
         fen = board.fen()
         self._send_command(f"position fen {fen}")
         
-        # Vraag beste zet (gebruik think_time of depth)
-        # movetime = vaste tijd, wtime/btime = max tijd (Stockfish kan eerder stoppen)
+        # Debug: log huidige settings
+        print(f"Stockfish settings: skill={self.skill_level}, threads={self.threads}, depth={self.depth}")
+        
+        # Vraag beste zet
+        # wtime/btime = maximum tijd, Stockfish gebruikt deze tijd optimaal
+        # Skill level bepaalt speelsterkte, niet depth parameter
+        # GEEN depth parameter bij wtime/btime - dit conflicteert en zorgt voor vroeg stoppen
         if think_time_ms is not None:
-            # Gebruik wtime/btime voor intelligente tijdverdeling
-            # Stockfish stopt eerder als hij zeker is van de beste zet
+            # Gebruik ALLEEN wtime/btime zonder depth
+            # Stockfish zal de volle tijd gebruiken om zo diep mogelijk te zoeken
+            # Skill level bepaalt hoe "goed" hij de zetten evalueert
+            print(f"Sending: go wtime {think_time_ms} btime {think_time_ms} winc 0 binc 0")
             self._send_command(f"go wtime {think_time_ms} btime {think_time_ms} winc 0 binc 0")
         else:
+            # Alleen depth (onbeperkte tijd) - voor testing/analysis
             self._send_command(f"go depth {self.depth}")
         
-        # Lees output tot we bestmove krijgen
+        # Lees output tot we bestmove krijgen (en log info lines voor debug)
         best_move = None
+        start_time = None
         while True:
             line = self.process.stdout.readline().strip()
+            
+            # Log info lines om te zien wat Stockfish doet
+            if line.startswith("info"):
+                if start_time is None:
+                    import time
+                    start_time = time.time()
+                # Toon alleen diepte en tijd info
+                if "depth" in line and "time" in line:
+                    parts = line.split()
+                    depth_idx = parts.index("depth") if "depth" in parts else -1
+                    time_idx = parts.index("time") if "time" in parts else -1
+                    if depth_idx >= 0 and time_idx >= 0 and depth_idx + 1 < len(parts) and time_idx + 1 < len(parts):
+                        depth_val = parts[depth_idx + 1]
+                        time_val = parts[time_idx + 1]
+                        print(f"  Stockfish: depth {depth_val}, time {time_val}ms")
+            
             if line.startswith("bestmove"):
                 # Parse: "bestmove e2e4 ponder e7e5"
                 parts = line.split()
