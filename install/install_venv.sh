@@ -8,6 +8,12 @@ echo "Chess Project - Virtual Environment Setup"
 echo "=========================================="
 echo ""
 
+# Installeer system dependencies
+echo "Installing system dependencies..."
+sudo apt-get update
+sudo apt-get install -y liblgpio-dev
+echo ""
+
 # Check of venv al bestaat
 if [ -d "venv" ]; then
     echo "⚠️  venv bestaat al. Activeer en update dependencies..."

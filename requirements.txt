@@ -5,3 +5,7 @@ RPi.GPIO
 python-chess
 py-draughts
 pygame
+adafruit-circuitpython-led-animation
+lgpio
+adafruit-circuitpython-neopixel-spi
+adafruit-circuitpython-pypixelbuf
