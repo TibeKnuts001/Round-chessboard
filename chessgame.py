@@ -153,6 +153,20 @@ class ChessGame(BaseGame):
             # Maak de zet
             self.engine.board.push(best_move)
             
+            # Update last move highlighting
+            if hasattr(self.gui, 'set_last_move'):
+                self.gui.set_last_move(from_square, to_square)
+            
+            # Set AI move pending voor LED feedback (blauw=from, groen=to)
+            # Speler moet deze move fysiek uitvoeren voordat game verder gaat
+            self.ai_move_pending = {
+                'from': from_square,
+                'to': to_square,
+                'intermediate': [],  # Chess heeft geen multi-captures
+                'piece_removed': False
+            }
+            print(f"  ai_move_pending ingesteld - wacht op fysieke uitvoering van {from_square} -> {to_square}")
+            
             # Check if a piece was captured (piece count decreased)
             pieces_after = self.count_pieces()
             if pieces_after < pieces_before:

@@ -84,9 +84,47 @@ class CheckersGame(BaseGame):
                 # Count pieces before move to detect captures
                 pieces_before = self.count_pieces()
                 
+                # Parse move to get from/to positions
+                move_str = str(best_move)
+                if 'x' in move_str:
+                    squares = move_str.split('x')
+                else:
+                    squares = move_str.split('-')
+                
+                from_checkers = int(squares[0])
+                to_checkers = int(squares[-1])
+                
+                # Convert to chess notation
+                from_pos = self.engine.CHECKERS_TO_CHESS.get(from_checkers)
+                to_pos = self.engine.CHECKERS_TO_CHESS.get(to_checkers)
+                
+                # Get intermediate squares for multi-captures
+                intermediate = []
+                if len(squares) > 2:
+                    for sq_str in squares[1:-1]:
+                        sq_num = int(sq_str)
+                        sq_chess = self.engine.CHECKERS_TO_CHESS.get(sq_num)
+                        if sq_chess:
+                            intermediate.append(sq_chess)
+                
                 self.engine.board.push(best_move)
                 self.engine.move_count += 1  # Track move count
                 print(f"AI speelt: {best_move}")
+                
+                # Update last move highlighting
+                if hasattr(self.gui, 'set_last_move') and from_pos and to_pos:
+                    self.gui.set_last_move(from_pos, to_pos, intermediate if intermediate else None)
+                
+                # Set AI move pending voor LED feedback (blauw=from, groen=to)
+                # Speler moet deze move fysiek uitvoeren voordat game verder gaat
+                if from_pos and to_pos:
+                    self.ai_move_pending = {
+                        'from': from_pos,
+                        'to': to_pos,
+                        'intermediate': intermediate,
+                        'piece_removed': False
+                    }
+                    print(f"  ai_move_pending ingesteld - wacht op fysieke uitvoering van {from_pos} -> {to_pos}")
                 
                 # Check if a piece was captured (piece count decreased)
                 pieces_after = self.count_pieces()

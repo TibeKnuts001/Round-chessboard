@@ -82,6 +82,7 @@ class BaseGame(ABC):
         self.last_mismatch_blink_state = False  # Track mismatch blink state voor sound effect
         self.screen_dirty = True  # Flag: herteken nodig (CPU optimalisatie)
         self.last_gui_result = {}  # Cache laatste gui_result voor button detection
+        self.ai_move_pending = None  # Track AI move execution: {'from': pos, 'to': pos, 'intermediate': [], 'piece_removed': False}
         
         # LED Animator voor idle effects
         self.led_animator = LEDAnimator(self.leds)
@@ -327,6 +328,25 @@ class BaseGame(ABC):
         """
         print(f"\nStuk weggehaald van {position}")
         
+        # Debug AI move pending state
+        if self.ai_move_pending:
+            print(f"  DEBUG: ai_move_pending.from = '{self.ai_move_pending.get('from')}'")
+            print(f"  DEBUG: position = '{position}'")
+            print(f"  DEBUG: Match check = {self.ai_move_pending.get('from', '').lower() == position.lower()}")
+        
+        # Check of dit AI move execution is (case-insensitive)
+        if self.ai_move_pending and self.ai_move_pending.get('from', '').lower() == position.lower():
+            print(f"  AI move stuk opgepakt - markeer als piece_removed")
+            self.ai_move_pending['piece_removed'] = True
+            return  # Skip normale handling
+        
+        # Als er een AI move pending is maar dit is NIET de AI move, blokkeer dan speler moves
+        if self.ai_move_pending:
+            print(f"  AI move pending - speler mag geen zet doen! Wacht tot AI move is uitgevoerd.")
+            self.sound_manager.play_mismatch()
+            self.show_temp_message("Please execute AI move first!", duration=2000)
+            return  # Blokkeer speler moves
+        
         # Check of we terugkomen van een invalid return (rood knipperen -> blauw knipperen)
         if self.invalid_return_position == position:
             print(f"  Terug opgepakt van ongeldige return positie - terug naar normaal blauw")
@@ -389,6 +409,60 @@ class BaseGame(ABC):
             position: Positie notatie waar stuk neergezet is
         """
         print(f"\nStuk neergezet op {position}")
+        
+        # Debug AI move pending state
+        if self.ai_move_pending:
+            print(f"  DEBUG: ai_move_pending = {self.ai_move_pending}")
+            print(f"  DEBUG: position = '{position}' (type: {type(position)})")
+            print(f"  DEBUG: to = '{self.ai_move_pending.get('to')}' (type: {type(self.ai_move_pending.get('to'))})")
+            print(f"  DEBUG: position.lower() = '{position.lower()}'")
+            print(f"  DEBUG: to.lower() = '{self.ai_move_pending.get('to', '').lower()}'")
+            print(f"  DEBUG: piece_removed = {self.ai_move_pending.get('piece_removed')}")
+            print(f"  DEBUG: Match check = {self.ai_move_pending.get('to', '').lower() == position.lower()}")
+        
+        # Check of dit AI move execution completion is (case-insensitive)
+        # Voor multi-captures moet het stuk op de final 'to' position komen, niet intermediate
+        if (self.ai_move_pending and 
+            self.ai_move_pending.get('piece_removed')):
+            
+            to_pos = self.ai_move_pending.get('to', '').lower()
+            pos_lower = position.lower()
+            
+            # Check of dit de final destination is
+            if to_pos == pos_lower:
+                print(f"  AI move volledig uitgevoerd! Toon witte LEDs.")
+                
+                # Toon witte LEDs voor uitgevoerde move
+                self.leds.clear()
+                from_pos = self.ai_move_pending.get('from')
+                to_pos_orig = self.ai_move_pending.get('to')
+                intermediate = self.ai_move_pending.get('intermediate', [])
+                
+                from_sensor = ChessMapper.chess_to_sensor(from_pos) if from_pos else None
+                to_sensor = ChessMapper.chess_to_sensor(to_pos_orig) if to_pos_orig else None
+                
+                if from_sensor is not None:
+                    self.leds.set_led(from_sensor, 100, 100, 100, 20)  # WIT
+                if to_sensor is not None:
+                    self.leds.set_led(to_sensor, 100, 100, 100, 20)  # WIT
+                
+                # Toon intermediate positions in paars
+                for inter_pos in intermediate:
+                    inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                    if inter_sensor is not None:
+                        self.leds.set_led(inter_sensor, 80, 0, 80, 0)  # Paars
+                
+                self.leds.show()
+                
+                # Clear ai_move_pending
+                self.ai_move_pending = None
+                print("  ai_move_pending cleared - speler kan weer bewegen")
+                return  # Skip normale handling
+            else:
+                # Stuk neergezet op verkeerde positie
+                print(f"  WAARSCHUWING: Stuk neergezet op {position}, maar AI move verwacht {to_pos}")
+                # Laat stuk daar - speler moet het naar de juiste plek verplaatsen
+                return  # Skip normale handling
         
         if self.selected_square:
             # Check of stuk teruggeplaatst wordt op originele positie
@@ -670,10 +744,11 @@ class BaseGame(ABC):
                         self.screen_dirty = True
                 
                 # Valideer board state (NA sensor handling, zodat selected_square up-to-date is)
-                # Alleen valideren als: spel gestart, setting enabled, EN geen actieve move
+                # Alleen valideren als: spel gestart, setting enabled, geen actieve move, EN geen AI move pending
                 if (self.game_started and 
                     not self.selected_square and 
                     not self.invalid_return_position and
+                    not self.ai_move_pending and
                     self.gui.settings.get('validate_board_state', False, section='debug')):
                     old_paused_state = self.game_paused
                     self.board_mismatch_positions = self.validate_board_state(current_sensors)
@@ -713,6 +788,39 @@ class BaseGame(ABC):
     
     def _update_led_animations(self):
         """Update LED blink animaties voor geselecteerd veld en warnings"""
+        # Check eerst of er een AI move pending is (heeft prioriteit, maar alleen als geen board mismatches)
+        if self.ai_move_pending and not self.board_mismatch_positions:
+            # Toon AI move: blauw voor from, groen voor to (constant, geen blink)
+            # Alleen updaten als de state veranderd is (voorkom onnodige LED updates die flikkering veroorzaken)
+            if not hasattr(self, '_ai_move_leds_set') or not self._ai_move_leds_set:
+                from_pos = self.ai_move_pending.get('from')
+                to_pos = self.ai_move_pending.get('to')
+                intermediate = self.ai_move_pending.get('intermediate', [])
+                
+                from_sensor = ChessMapper.chess_to_sensor(from_pos) if from_pos else None
+                to_sensor = ChessMapper.chess_to_sensor(to_pos) if to_pos else None
+                
+                self.leds.clear()
+                if from_sensor is not None:
+                    self.leds.set_led(from_sensor, 0, 0, 255, 0)  # BLAUW - pak dit stuk op
+                if to_sensor is not None:
+                    self.leds.set_led(to_sensor, 0, 255, 0, 0)  # GROEN - verplaats naar hier
+                
+                # Toon intermediate positions in geel (voor multi-captures)
+                for pos in intermediate:
+                    inter_sensor = ChessMapper.chess_to_sensor(pos)
+                    if inter_sensor is not None:
+                        self.leds.set_led(inter_sensor, 255, 255, 0, 0)  # GEEL
+                
+                self.leds.show()
+                self._ai_move_leds_set = True
+                print("  AI move LEDs gezet (blauw/groen)")
+            return
+        else:
+            # Clear flag als ai_move_pending niet meer bestaat
+            if hasattr(self, '_ai_move_leds_set'):
+                self._ai_move_leds_set = False
+        
         if self.selected_square:
             # Bereken knipperstaat (500ms aan, 500ms uit)
             blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
@@ -1485,6 +1593,11 @@ class BaseGame(ABC):
             self.selected_square = None
             self.leds.clear()
             self.leds.show()
+        
+        # Clear AI move pending
+        if self.ai_move_pending:
+            self.ai_move_pending = None
+            print("  ai_move_pending cleared")
     
     def cleanup(self):
         """Cleanup resources"""
@@ -1507,6 +1620,10 @@ class BaseGame(ABC):
         self.gui.assisted_setup_step = 0
         self.gui.assisted_setup_waiting = True
         self.assisted_setup_placed_squares = set()  # Track welke squares al geplaatst zijn
+        
+        # Clear AI move pending
+        self.ai_move_pending = None
+        
         self._show_current_setup_step()
     
     def _get_setup_steps(self):
