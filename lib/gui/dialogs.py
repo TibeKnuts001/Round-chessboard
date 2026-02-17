@@ -391,3 +391,79 @@ class DialogRenderer:
         self.screen.blit(no_text, no_text_rect)
         
         return yes_button, no_button
+    
+    def draw_update_status_dialog(self, update_info):
+        """
+        Teken update status dialog
+        
+        Args:
+            update_info: Dict met keys:
+                - 'status': 'checking', 'up_to_date', 'available', 'success', 'error'
+                - 'message': str met status bericht
+                - 'details': optional list van detail regels
+        
+        Returns:
+            ok_button rect (alleen voor success/error/up_to_date)
+        """
+        self._draw_overlay()
+        
+        status = update_info.get('status', 'checking')
+        message = update_info.get('message', 'Checking for updates...')
+        details = update_info.get('details', [])
+        
+        # Dialog dimensions (groter voor meer info)
+        dialog_width = 500
+        dialog_height = 250 + (len(details) * 25)
+        dialog_x = (self.screen_width - dialog_width) // 2
+        dialog_y = (self.screen_height - dialog_height) // 2
+        
+        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height)
+        pygame.draw.rect(self.screen, self.COLOR_WHITE, dialog_rect, border_radius=15)
+        
+        # Title based on status
+        title_text = {
+            'checking': 'Checking Updates...',
+            'up_to_date': 'Up to Date',
+            'available': 'Update Available',
+            'success': 'Update Successful!',
+            'error': 'Update Failed'
+        }.get(status, 'Update Status')
+        
+        title = self.font.render(title_text, True, self.COLOR_BLACK)
+        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 40))
+        self.screen.blit(title, title_rect)
+        
+        # Main message
+        y_pos = dialog_y + 90
+        message_text = self.font_small.render(message, True, (60, 60, 60))
+        message_rect = message_text.get_rect(center=(self.screen_width // 2, y_pos))
+        self.screen.blit(message_text, message_rect)
+        
+        # Details
+        y_pos += 40
+        for detail in details:
+            detail_text = self.font_small.render(detail, True, (100, 100, 100))
+            detail_rect = detail_text.get_rect(center=(self.screen_width // 2, y_pos))
+            self.screen.blit(detail_text, detail_rect)
+            y_pos += 25
+        
+        # OK button (only for final states)
+        if status in ['up_to_date', 'success', 'error']:
+            ok_button = pygame.Rect(
+                self.screen_width // 2 - 65,
+                dialog_y + dialog_height - 70,
+                130,
+                50
+            )
+            
+            mouse_pos = pygame.mouse.get_pos()
+            button_color = self.COLOR_BUTTON_HOVER if ok_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
+            pygame.draw.rect(self.screen, button_color, ok_button, border_radius=10)
+            
+            ok_text = self.font.render("OK", True, self.COLOR_WHITE)
+            ok_text_rect = ok_text.get_rect(center=ok_button.center)
+            self.screen.blit(ok_text, ok_text_rect)
+            
+            return ok_button
+        
+        return None

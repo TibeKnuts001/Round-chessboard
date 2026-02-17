@@ -1483,6 +1483,23 @@ class BaseGame(ABC):
         screensaver_button = gui_result.get('screensaver_button')
         test_position_button = gui_result.get('test_position_button')
         tutorial_button = gui_result.get('tutorial_button')
+        check_updates_button = gui_result.get('check_updates_button')
+        update_ok_button = gui_result.get('update_ok_button')
+        
+        # Check update OK button
+        if update_ok_button and update_ok_button.collidepoint(pos):
+            self.gui.show_update_status_dialog = False
+            self.gui.update_info = {}
+            self.screen_dirty = True
+            return
+        
+        # Check updates button
+        if check_updates_button and check_updates_button.collidepoint(pos):
+            print("Checking for updates...")
+            self.gui.show_settings = False
+            self.gui.temp_settings = {}
+            self._check_for_updates()
+            return
         
         # Check test position button (chess only)
         if test_position_button and test_position_button.collidepoint(pos):
@@ -2138,6 +2155,115 @@ class BaseGame(ABC):
         
         self.screen.blit(instruction, instruction_rect)
         self.screen.blit(instruction2, instruction2_rect)
+    
+    def _check_for_updates(self):
+        """Check for updates by running update script in dry-run mode"""
+        import subprocess
+        import os
+        
+        # Show checking status
+        self.gui.update_info = {
+            'status': 'checking',
+            'message': 'Checking for updates...',
+            'details': []
+        }
+        self.gui.show_update_status_dialog = True
+        self.screen_dirty = True
+        
+        # Force screen update to show dialog
+        pygame.display.flip()
+        
+        try:
+            # Get script directory
+            script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            update_script = os.path.join(script_dir, 'update.sh')
+            
+            # Check if update script exists
+            if not os.path.exists(update_script):
+                self.gui.update_info = {
+                    'status': 'error',
+                    'message': 'Update script not found',
+                    'details': ['Please ensure update.sh exists in the project root']
+                }
+                self.screen_dirty = True
+                return
+            
+            # Run update script with check-only mode (just check, don't update)
+            # We'll parse the output to see if updates are available
+            result = subprocess.run(
+                ['/bin/bash', update_script],
+                cwd=script_dir,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            output = result.stdout + result.stderr
+            print(f"Update check output:\n{output}")
+            
+            # Parse output
+            if 'Already up to date' in output:
+                # Extract version if available
+                version = ''
+                for line in output.split('\n'):
+                    if 'version:' in line.lower():
+                        # Extract version hash (first 7 chars)
+                        parts = line.split(':')
+                        if len(parts) > 1:
+                            version = parts[1].strip()[:7]
+                        break
+                
+                details = []
+                if version:
+                    details.append(f'Current version: {version}')
+                details.append('You have the latest version installed')
+                
+                self.gui.update_info = {
+                    'status': 'up_to_date',
+                    'message': 'Your installation is up to date!',
+                    'details': details
+                }
+            elif 'Update completed successfully' in output or 'Update available' in output:
+                self.gui.update_info = {
+                    'status': 'success',
+                    'message': 'Update completed successfully!',
+                    'details': [
+                        'New version installed',
+                        '',
+                        'Please restart the application:',
+                        '1. Exit the game',
+                        '2. Run ./run.sh to start with new version'
+                    ]
+                }
+            elif result.returncode != 0:
+                error_lines = [line.strip() for line in output.split('\n') if line.strip() and not line.startswith('#')][-3:]
+                self.gui.update_info = {
+                    'status': 'error',
+                    'message': 'Update check failed',
+                    'details': error_lines if error_lines else ['Unknown error occurred']
+                }
+            else:
+                # Unexpected output
+                self.gui.update_info = {
+                    'status': 'error',
+                    'message': 'Could not determine update status',
+                    'details': ['Please check update.log for details']
+                }
+                
+        except subprocess.TimeoutExpired:
+            self.gui.update_info = {
+                'status': 'error',
+                'message': 'Update check timed out',
+                'details': ['Check your internet connection', 'and try again']
+            }
+        except Exception as e:
+            self.gui.update_info = {
+                'status': 'error',
+                'message': 'Error checking for updates',
+                'details': [str(e)]
+            }
+        
+        self.screen_dirty = True
     
     def _advance_setup_step(self):
         """Advance to next setup step"""

@@ -1,11 +1,11 @@
 #!/bin/bash
 # Update Script - Download latest changes from GitHub
-# Works for both git repositories and direct installations
+# Uses git for version tracking and updates
 # Usage: ./update.sh
 
 set -e  # Stop on errors
 
-REPO_URL="https://github.com/TibeKnuts001/Round-chessboard"
+REPO_URL="https://github.com/TibeKnuts001/Round-chessboard.git"
 BRANCH="main"
 
 echo "================================"
@@ -13,96 +13,89 @@ echo "Round Chess Update Script"
 echo "================================"
 echo ""
 
-# Check if we're in a valid git repository
-if git rev-parse --git-dir > /dev/null 2>&1; then
-    # Git repository: use git to check for updates
-    echo "Checking for updates..."
-    git fetch origin --quiet
+# Check if we have a valid git repository with HEAD
+if ! git rev-parse HEAD > /dev/null 2>&1; then
+    # No git repository or incomplete initialization
+    echo "Setting up git repository..."
+    echo ""
     
-    LOCAL=$(git rev-parse HEAD)
-    REMOTE=$(git rev-parse origin/$BRANCH)
-    
-    if [ "$LOCAL" = "$REMOTE" ]; then
-        echo "✓ Already up to date! (version: ${LOCAL:0:7})"
-        exit 0
+    # Check if settings.json exists (preserve user data)
+    HAS_SETTINGS=false
+    if [ -f "settings.json" ]; then
+        HAS_SETTINGS=true
+        echo "Backing up settings.json..."
+        cp settings.json settings.json.bak
     fi
     
-    echo "Update available: ${LOCAL:0:7} -> ${REMOTE:0:7}"
-    echo ""
-    echo "Pulling changes..."
-    git pull origin $BRANCH
+    # Remove incomplete .git if it exists
+    if [ -d ".git" ]; then
+        echo "Cleaning up incomplete git repository..."
+        rm -rf .git
+    fi
+    
+    # Initialize git repository
+    git init
+    git remote add origin "$REPO_URL"
+    
+    echo "Downloading code from GitHub..."
+    git fetch origin
+    
+    echo "Checking out main branch..."
+    git checkout -f -b $BRANCH origin/$BRANCH
+    
+    # Restore settings if it existed
+    if [ "$HAS_SETTINGS" = true ]; then
+        echo "Restoring settings.json..."
+        mv settings.json.bak settings.json
+    fi
+    
+    # Set permissions
+    chmod +x *.sh 2>/dev/null || true
+    chmod +x install/*.sh 2>/dev/null || true
     
     echo ""
-    echo "✓ Update completed successfully!"
-    echo "Restart the application to use the updated code."
+    echo "================================"
+    echo "✓ Installation completed!"
+    echo "================================"
+    echo "You can now run ./run.sh to start the application"
     exit 0
 fi
 
-# Non-git installation: download from GitHub
-echo "Non-git installation detected"
-echo ""
-
-# Check current version (if available)
-CURRENT_VERSION=""
-if [ -f ".version" ]; then
-    CURRENT_VERSION=$(cat .version)
-    echo "Current version: ${CURRENT_VERSION:0:7}"
-fi
-
-# Get latest version from GitHub
+# Git repository exists: check for updates
 echo "Checking for updates..."
-LATEST_VERSION=$(curl -s "https://api.github.com/repos/TibeKnuts001/Round-chessboard/commits/$BRANCH" | grep '"sha"' | head -1 | cut -d'"' -f4)
+git fetch origin --quiet
 
-if [ -z "$LATEST_VERSION" ]; then
-    echo "Warning: Could not check latest version from GitHub"
-    read -p "Continue with update anyway? [y/N]: " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Update cancelled"
-        exit 0
-    fi
-elif [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-    echo "✓ Already up to date! (version: ${LATEST_VERSION:0:7})"
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/$BRANCH)
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+    echo "✓ Already up to date! (version: ${LOCAL:0:7})"
     exit 0
-else
-    if [ -n "$CURRENT_VERSION" ]; then
-        echo "Update available: ${CURRENT_VERSION:0:7} -> ${LATEST_VERSION:0:7}"
-    else
-        echo "Installing latest version: ${LATEST_VERSION:0:7}"
-    fi
 fi
+
+echo "Update available: ${LOCAL:0:7} -> ${REMOTE:0:7}"
 echo ""
 
-echo "Downloading latest code..."
-TEMP_DIR=$(mktemp -d)
-
-if command -v git >/dev/null 2>&1; then
-    git clone --depth 1 --branch $BRANCH "$REPO_URL.git" "$TEMP_DIR"
-    rm -rf "$TEMP_DIR/.git"
-elif command -v wget >/dev/null 2>&1; then
-    wget -q "$REPO_URL/archive/refs/heads/$BRANCH.zip" -O "$TEMP_DIR/repo.zip"
-    unzip -q "$TEMP_DIR/repo.zip" -d "$TEMP_DIR"
-    mv "$TEMP_DIR/Round-chessboard-$BRANCH"/* "$TEMP_DIR/"
-    rm -rf "$TEMP_DIR/Round-chessboard-$BRANCH" "$TEMP_DIR/repo.zip"
-elif command -v curl >/dev/null 2>&1; then
-    curl -sL "$REPO_URL/archive/refs/heads/$BRANCH.zip" -o "$TEMP_DIR/repo.zip"
-    unzip -q "$TEMP_DIR/repo.zip" -d "$TEMP_DIR"
-    mv "$TEMP_DIR/Round-chessboard-$BRANCH"/* "$TEMP_DIR/"
-    rm -rf "$TEMP_DIR/Round-chessboard-$BRANCH" "$TEMP_DIR/repo.zip"
-else
-    echo "Error: No download tool available (git/wget/curl)"
-    exit 1
+# Backup settings.json before pull
+if [ -f "settings.json" ]; then
+    echo "Backing up settings.json..."
+    cp settings.json settings.json.bak
 fi
 
-echo "Updating files..."
-rsync -a --exclude='settings.json' --exclude='venv' --exclude='.version' --exclude='*.pyc' --exclude='__pycache__' "$TEMP_DIR/" ./
-rm -rf "$TEMP_DIR"
+echo "Pulling changes..."
+git pull origin $BRANCH
 
-# Save version for next check
-if [ -n "$LATEST_VERSION" ]; then
-    echo "$LATEST_VERSION" > .version
+# Clean up old/removed files (but keep settings.json, venv, etc.)
+echo "Cleaning up old files..."
+git clean -fd -e settings.json -e venv -e .vscode
+
+# Restore settings if backup exists
+if [ -f "settings.json.bak" ]; then
+    echo "Restoring settings.json..."
+    mv settings.json.bak settings.json
 fi
 
+# Set permissions
 chmod +x *.sh 2>/dev/null || true
 chmod +x install/*.sh 2>/dev/null || true
 

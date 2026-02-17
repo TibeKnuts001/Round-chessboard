@@ -132,6 +132,8 @@ class CheckersGUI:
         self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
         self.show_undo_confirm = False  # Voor undo confirmation
         self.show_power_dropdown = False
+        self.show_update_status_dialog = False  # Voor update status dialog
+        self.update_info = {}  # Update status information
         self.assisted_setup_mode = False
         self.assisted_setup_step = 0
         self.assisted_setup_waiting = False
@@ -396,10 +398,13 @@ class CheckersGUI:
             result['dropdowns'] = dropdowns
             result['dropdown_items'] = dropdown_items
             result['power_profiles'] = power_profiles
+        elif self.show_update_status_dialog:
+            update_ok_button = self.dialog_renderer.draw_update_status_dialog(self.update_info)
+            result['update_ok_button'] = update_ok_button
         
         # Temp message overlay - alleen als GEEN dialogs open zijn
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm or self.show_update_status_dialog):
                 # Kies notification type op basis van message content
                 # Als message een list is, check de eerste regel
                 check_text = temp_message[0] if isinstance(temp_message, list) else temp_message

@@ -136,6 +136,8 @@ class ChessGUI:
         self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
         self.show_undo_confirm = False  # Voor undo confirmation
         self.show_promotion_dialog = False  # Voor pawn promotion dialog
+        self.show_update_status_dialog = False  # Voor update status dialog
+        self.update_info = {}  # Update status information
         self.promotion_choice = None  # 'q', 'r', 'b', 'n'
         self.promotion_from = None  # Van positie
         self.promotion_to = None  # Naar positie
@@ -518,6 +520,7 @@ class ChessGUI:
         screensaver_button = None
         test_position_button = None
         tutorial_button = None
+        check_updates_button = None
         if self.show_settings:
             settings_result = self.draw_settings_dialog()
             ok_button = settings_result['ok_button']
@@ -526,6 +529,11 @@ class ChessGUI:
             toggles = settings_result['toggles']
             dropdowns = settings_result.get('dropdowns', {})
             dropdown_items = settings_result.get('dropdown_items', [])
+            power_profiles = settings_result.get('power_profiles', [])
+            screensaver_button = settings_result.get('screensaver_button')
+            test_position_button = settings_result.get('test_position_button')
+            tutorial_button = settings_result.get('tutorial_button')
+            check_updates_button = settings_result.get('check_updates_button')
             power_profiles = settings_result.get('power_profiles', [])
             screensaver_button = settings_result.get('screensaver_button')
             test_position_button = settings_result.get('test_position_button')
@@ -575,10 +583,15 @@ class ChessGUI:
         if self.show_promotion_dialog:
             promotion_buttons = self.draw_promotion_dialog()
         
+        # Teken update status dialog indien nodig
+        update_ok_button = None
+        if self.show_update_status_dialog:
+            update_ok_button = self.dialog_renderer.draw_update_status_dialog(self.update_info)
+        
         # Teken temp message bovenop alles (als actief en geen dialogs open)
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
             # Niet tonen als er een dialog open is
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm or self.show_promotion_dialog):
+            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm or self.show_promotion_dialog or self.show_update_status_dialog):
                 # Parse message: kan string, list of tuple (message, type) zijn
                 if isinstance(temp_message, tuple):
                     message_text, notification_type = temp_message
@@ -605,6 +618,7 @@ class ChessGUI:
             'screensaver_button': screensaver_button,
             'test_position_button': test_position_button,
             'tutorial_button': tutorial_button,
+            'check_updates_button': check_updates_button,
             'undo_button': self.undo_button,
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,
@@ -617,7 +631,8 @@ class ChessGUI:
             'skip_setup_no': skip_setup_no_button,
             'undo_yes': undo_yes_button,
             'undo_no': undo_no_button,
-            'promotion_buttons': promotion_buttons if self.show_promotion_dialog else {}
+            'promotion_buttons': promotion_buttons if self.show_promotion_dialog else {},
+            'update_ok_button': update_ok_button
         }
     
     def handle_settings_click(self, pos):

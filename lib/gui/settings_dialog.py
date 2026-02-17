@@ -90,7 +90,8 @@ class SettingsDialog:
             'toggles': {},
             'dropdowns': {},
             'screensaver_button': None,  # Default None, wordt gezet in debug tab
-            'tutorial_button': None  # Default None, wordt gezet in general tab
+            'tutorial_button': None,  # Default None, wordt gezet in general tab
+            'check_updates_button': None  # Default None, wordt gezet in general tab
         }
         
         start_x = dialog_x + (dialog_width - (len(tab_list) * (tab_width + tab_spacing) - tab_spacing)) // 2
@@ -257,6 +258,18 @@ class SettingsDialog:
             self.font_small
         )
         result['tutorial_button'] = tutorial_button
+        
+        y_pos += 60
+        
+        # Check for Updates button
+        check_updates_button_rect = pygame.Rect(label_x, y_pos, 250, 45)
+        check_updates_button = UIWidgets.draw_button(
+            self.screen,
+            check_updates_button_rect,
+            "Check for Updates",
+            self.font_small
+        )
+        result['check_updates_button'] = check_updates_button
     
     def _draw_debug_tab(self, dialog_x, content_y, settings, result):
         """Teken debug tab (debug settings - shared)"""
