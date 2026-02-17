@@ -1464,6 +1464,14 @@ class BaseGame(ABC):
             elif self.gui.handle_stop_game_no_click(pos, stop_game_no_button):
                 pass
         
+        # Update status dialog
+        elif self.gui.show_update_status_dialog:
+            update_ok_button = gui_result.get('update_ok_button')
+            if update_ok_button and update_ok_button.collidepoint(pos):
+                self.gui.show_update_status_dialog = False
+                self.gui.update_info = {}
+                self.screen_dirty = True
+        
         # Settings dialog
         elif self.gui.show_settings:
             self._handle_settings_click(pos, gui_result)
@@ -1484,14 +1492,6 @@ class BaseGame(ABC):
         test_position_button = gui_result.get('test_position_button')
         tutorial_button = gui_result.get('tutorial_button')
         check_updates_button = gui_result.get('check_updates_button')
-        update_ok_button = gui_result.get('update_ok_button')
-        
-        # Check update OK button
-        if update_ok_button and update_ok_button.collidepoint(pos):
-            self.gui.show_update_status_dialog = False
-            self.gui.update_info = {}
-            self.screen_dirty = True
-            return
         
         # Check updates button
         if check_updates_button and check_updates_button.collidepoint(pos):
