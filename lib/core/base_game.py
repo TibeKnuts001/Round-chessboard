@@ -2042,12 +2042,29 @@ class BaseGame(ABC):
         current_step = self.assisted_setup_steps[self.gui.assisted_setup_step]
         current_sensors = self.read_sensors()
         
+        # Track if we need to update LEDs
+        leds_changed = False
+        
         # Check if current step is complete
         step_complete = False
         
         if current_step['type'] == 'remove':
             # Check if all pieces are removed (sensors should be False)
             squares = current_step['squares']
+            
+            # Update LEDs for individual pieces - turn off when removed
+            for square in squares:
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    is_removed = not current_sensors.get(square, False)
+                    if is_removed:
+                        # Piece removed - turn LED off
+                        self.leds.set_led(sensor_num, 0, 0, 0, 0)
+                        leds_changed = True
+                    else:
+                        # Piece still there - keep LED red
+                        self.leds.set_led(sensor_num, 255, 0, 0, 0)
+            
             all_removed = all(not current_sensors.get(sq, False) for sq in squares)
             
             if all_removed:
@@ -2056,16 +2073,40 @@ class BaseGame(ABC):
         
         elif current_step['type'] == 'place':
             # Check if all pieces are placed (sensors should be True)
-            squares = [p['pos'] for p in current_step['pieces']]
+            pieces = current_step['pieces']
+            
+            # Update LEDs for individual pieces - turn off when placed
+            for piece_info in pieces:
+                square = piece_info['pos']
+                piece = piece_info['piece']
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    is_placed = current_sensors.get(square, False)
+                    if is_placed:
+                        # Piece placed - turn LED off
+                        self.leds.set_led(sensor_num, 0, 0, 0, 0)
+                        leds_changed = True
+                    else:
+                        # Piece not yet placed - keep LED on with correct color
+                        if self._is_white_piece(piece):
+                            self.leds.set_led(sensor_num, 255, 255, 255, 0)  # WHITE
+                        else:
+                            self.leds.set_led(sensor_num, 200, 100, 0, 0)     # ORANGE
+            
+            squares = [p['pos'] for p in pieces]
             all_placed = all(current_sensors.get(sq, False) for sq in squares)
             
             if all_placed:
                 print(f"  Step {self.gui.assisted_setup_step + 1} complete: All pieces placed")
                 step_complete = True
         
+        # Update LEDs if changed
+        if leds_changed:
+            self.leds.show()
+        
         # Advance to next step if complete
         if step_complete:
-            self.sound_manager.play_select()  # Feedback sound
+            self.sound_manager.play_capture()  # Feedback sound (step complete)
             self.gui.assisted_setup_step += 1
             self._show_current_setup_step()
     
