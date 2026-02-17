@@ -449,14 +449,14 @@ class DialogRenderer:
         
         # Buttons based on status
         if status == 'available':
-            # Two buttons: Update Now and Cancel
+            # Two buttons: Update and Cancel
             button_y = dialog_y + dialog_height - 70
             
-            # Update Now button (left)
+            # Update button (left)
             update_button = pygame.Rect(
-                self.screen_width // 2 - 150,
+                self.screen_width // 2 - 140,
                 button_y,
-                130,
+                120,
                 50
             )
             
@@ -464,16 +464,16 @@ class DialogRenderer:
             cancel_button = pygame.Rect(
                 self.screen_width // 2 + 20,
                 button_y,
-                130,
+                120,
                 50
             )
             
             mouse_pos = pygame.mouse.get_pos()
             
-            # Draw Update Now button
+            # Draw Update button
             update_color = self.COLOR_BUTTON_HOVER if update_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
             pygame.draw.rect(self.screen, update_color, update_button, border_radius=10)
-            update_text = self.font.render("Update Now", True, self.COLOR_WHITE)
+            update_text = self.font.render("Update", True, self.COLOR_WHITE)
             update_text_rect = update_text.get_rect(center=update_button.center)
             self.screen.blit(update_text, update_text_rect)
             
