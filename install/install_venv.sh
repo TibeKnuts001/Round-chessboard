@@ -11,7 +11,7 @@ echo ""
 # Installeer system dependencies
 echo "Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y liblgpio-dev mpg123
+sudo apt-get install -y liblgpio-dev mpg123 libopenblas0
 echo ""
 
 # Check of venv al bestaat
