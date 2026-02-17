@@ -584,9 +584,9 @@ class ChessGUI:
             promotion_buttons = self.draw_promotion_dialog()
         
         # Teken update status dialog indien nodig
-        update_ok_button = None
+        update_dialog_buttons = None
         if self.show_update_status_dialog:
-            update_ok_button = self.dialog_renderer.draw_update_status_dialog(self.update_info)
+            update_dialog_buttons = self.dialog_renderer.draw_update_status_dialog(self.update_info)
         
         # Teken temp message bovenop alles (als actief en geen dialogs open)
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
@@ -632,7 +632,7 @@ class ChessGUI:
             'undo_yes': undo_yes_button,
             'undo_no': undo_no_button,
             'promotion_buttons': promotion_buttons if self.show_promotion_dialog else {},
-            'update_ok_button': update_ok_button
+            'update_dialog_buttons': update_dialog_buttons
         }
     
     def handle_settings_click(self, pos):

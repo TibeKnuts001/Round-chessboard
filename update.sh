@@ -1,12 +1,18 @@
 #!/bin/bash
 # Update Script - Download latest changes from GitHub
 # Uses git for version tracking and updates
-# Usage: ./update.sh
+# Usage: ./update.sh [--check-only]
 
 set -e  # Stop on errors
 
 REPO_URL="https://github.com/TibeKnuts001/Round-chessboard.git"
 BRANCH="main"
+CHECK_ONLY=false
+
+# Parse arguments
+if [ "$1" = "--check-only" ]; then
+    CHECK_ONLY=true
+fi
 
 echo "================================"
 echo "Round Chess Update Script"
@@ -75,6 +81,12 @@ fi
 
 echo "Update available: ${LOCAL:0:7} -> ${REMOTE:0:7}"
 echo ""
+
+# If check-only mode, stop here
+if [ "$CHECK_ONLY" = true ]; then
+    echo "Check complete. Run without --check-only to update."
+    exit 1  # Exit code 1 to signal update available
+fi
 
 # Backup settings.json before pull
 if [ -f "settings.json" ]; then

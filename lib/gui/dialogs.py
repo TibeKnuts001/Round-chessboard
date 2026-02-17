@@ -447,8 +447,47 @@ class DialogRenderer:
             self.screen.blit(detail_text, detail_rect)
             y_pos += 25
         
-        # OK button (only for final states)
-        if status in ['up_to_date', 'success', 'error']:
+        # Buttons based on status
+        if status == 'available':
+            # Two buttons: Update Now and Cancel
+            button_y = dialog_y + dialog_height - 70
+            
+            # Update Now button (left)
+            update_button = pygame.Rect(
+                self.screen_width // 2 - 150,
+                button_y,
+                130,
+                50
+            )
+            
+            # Cancel button (right)
+            cancel_button = pygame.Rect(
+                self.screen_width // 2 + 20,
+                button_y,
+                130,
+                50
+            )
+            
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Draw Update Now button
+            update_color = self.COLOR_BUTTON_HOVER if update_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
+            pygame.draw.rect(self.screen, update_color, update_button, border_radius=10)
+            update_text = self.font.render("Update Now", True, self.COLOR_WHITE)
+            update_text_rect = update_text.get_rect(center=update_button.center)
+            self.screen.blit(update_text, update_text_rect)
+            
+            # Draw Cancel button
+            cancel_color = (150, 150, 150) if cancel_button.collidepoint(mouse_pos) else (120, 120, 120)
+            pygame.draw.rect(self.screen, cancel_color, cancel_button, border_radius=10)
+            cancel_text = self.font.render("Cancel", True, self.COLOR_WHITE)
+            cancel_text_rect = cancel_text.get_rect(center=cancel_button.center)
+            self.screen.blit(cancel_text, cancel_text_rect)
+            
+            return {'update_button': update_button, 'cancel_button': cancel_button}
+        
+        elif status in ['up_to_date', 'success', 'error']:
+            # Single OK button
             ok_button = pygame.Rect(
                 self.screen_width // 2 - 65,
                 dialog_y + dialog_height - 70,
@@ -464,6 +503,6 @@ class DialogRenderer:
             ok_text_rect = ok_text.get_rect(center=ok_button.center)
             self.screen.blit(ok_text, ok_text_rect)
             
-            return ok_button
+            return {'ok_button': ok_button}
         
         return None

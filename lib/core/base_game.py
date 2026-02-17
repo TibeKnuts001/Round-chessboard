@@ -1466,11 +1466,27 @@ class BaseGame(ABC):
         
         # Update status dialog
         elif self.gui.show_update_status_dialog:
-            update_ok_button = gui_result.get('update_ok_button')
-            if update_ok_button and update_ok_button.collidepoint(pos):
-                self.gui.show_update_status_dialog = False
-                self.gui.update_info = {}
-                self.screen_dirty = True
+            update_dialog_buttons = gui_result.get('update_dialog_buttons')
+            if update_dialog_buttons:
+                # OK button (for up_to_date, success, error)
+                ok_button = update_dialog_buttons.get('ok_button')
+                if ok_button and ok_button.collidepoint(pos):
+                    self.gui.show_update_status_dialog = False
+                    self.gui.update_info = {}
+                    self.screen_dirty = True
+                
+                # Update button (for available)
+                update_button = update_dialog_buttons.get('update_button')
+                if update_button and update_button.collidepoint(pos):
+                    print("Starting update...")
+                    self._perform_update()
+                
+                # Cancel button (for available)
+                cancel_button = update_dialog_buttons.get('cancel_button')
+                if cancel_button and cancel_button.collidepoint(pos):
+                    self.gui.show_update_status_dialog = False
+                    self.gui.update_info = {}
+                    self.screen_dirty = True
         
         # Settings dialog
         elif self.gui.show_settings:
@@ -2189,9 +2205,8 @@ class BaseGame(ABC):
                 return
             
             # Run update script with check-only mode (just check, don't update)
-            # We'll parse the output to see if updates are available
             result = subprocess.run(
-                ['/bin/bash', update_script],
+                ['/bin/bash', update_script, '--check-only'],
                 cwd=script_dir,
                 capture_output=True,
                 text=True,
@@ -2202,7 +2217,10 @@ class BaseGame(ABC):
             print(f"Update check output:\n{output}")
             
             # Parse output
-            if 'Already up to date' in output:
+            # Exit code 0: up to date
+            # Exit code 1: update available
+            # Other: error
+            if result.returncode == 0 and 'Already up to date' in output:
                 # Extract version if available
                 version = ''
                 for line in output.split('\n'):
@@ -2223,31 +2241,32 @@ class BaseGame(ABC):
                     'message': 'Your installation is up to date!',
                     'details': details
                 }
-            elif 'Update completed successfully' in output or 'Update available' in output:
+            elif result.returncode == 1 and 'Update available' in output:
+                # Extract version info
+                versions = ''
+                for line in output.split('\n'):
+                    if 'Update available:' in line:
+                        versions = line.split(':', 1)[1].strip()
+                        break
+                
+                details = []
+                if versions:
+                    details.append(f'Version: {versions}')
+                details.append('')
+                details.append('Would you like to update now?')
+                
                 self.gui.update_info = {
-                    'status': 'success',
-                    'message': 'Update completed successfully!',
-                    'details': [
-                        'New version installed',
-                        '',
-                        'Please restart the application:',
-                        '1. Exit the game',
-                        '2. Run ./run.sh to start with new version'
-                    ]
+                    'status': 'available',
+                    'message': 'A new version is available!',
+                    'details': details
                 }
-            elif result.returncode != 0:
+            else:
+                # Error
                 error_lines = [line.strip() for line in output.split('\n') if line.strip() and not line.startswith('#')][-3:]
                 self.gui.update_info = {
                     'status': 'error',
                     'message': 'Update check failed',
                     'details': error_lines if error_lines else ['Unknown error occurred']
-                }
-            else:
-                # Unexpected output
-                self.gui.update_info = {
-                    'status': 'error',
-                    'message': 'Could not determine update status',
-                    'details': ['Please check update.log for details']
                 }
                 
         except subprocess.TimeoutExpired:
@@ -2260,6 +2279,77 @@ class BaseGame(ABC):
             self.gui.update_info = {
                 'status': 'error',
                 'message': 'Error checking for updates',
+                'details': [str(e)]
+            }
+        
+        self.screen_dirty = True
+    
+    def _perform_update(self):
+        """Perform actual update"""
+        import subprocess
+        import os
+        
+        # Show updating status
+        self.gui.update_info = {
+            'status': 'checking',
+            'message': 'Updating...',
+            'details': ['Please wait while the update is being installed']
+        }
+        self.gui.show_update_status_dialog = True
+        self.screen_dirty = True
+        
+        # Force screen update to show dialog
+        pygame.display.flip()
+        
+        try:
+            # Get script directory
+            script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            update_script = os.path.join(script_dir, 'update.sh')
+            
+            # Run update script without --check-only (full update)
+            result = subprocess.run(
+                ['/bin/bash', update_script],
+                cwd=script_dir,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            output = result.stdout + result.stderr
+            print(f"Update output:\n{output}")
+            
+            # Check if successful
+            if result.returncode == 0 and 'Update completed successfully' in output:
+                self.gui.update_info = {
+                    'status': 'success',
+                    'message': 'Update completed successfully!',
+                    'details': [
+                        'New version installed',
+                        '',
+                        'Please restart the application:',
+                        '1. Exit the game',
+                        '2. Run ./run.sh to start with new version'
+                    ]
+                }
+            else:
+                # Error
+                error_lines = [line.strip() for line in output.split('\n') if line.strip() and not line.startswith('#')][-3:]
+                self.gui.update_info = {
+                    'status': 'error',
+                    'message': 'Update failed',
+                    'details': error_lines if error_lines else ['Unknown error occurred']
+                }
+                
+        except subprocess.TimeoutExpired:
+            self.gui.update_info = {
+                'status': 'error',
+                'message': 'Update timed out',
+                'details': ['The update took too long', 'Please try again']
+            }
+        except Exception as e:
+            self.gui.update_info = {
+                'status': 'error',
+                'message': 'Error performing update',
                 'details': [str(e)]
             }
         

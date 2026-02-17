@@ -399,8 +399,8 @@ class CheckersGUI:
             result['dropdown_items'] = dropdown_items
             result['power_profiles'] = power_profiles
         elif self.show_update_status_dialog:
-            update_ok_button = self.dialog_renderer.draw_update_status_dialog(self.update_info)
-            result['update_ok_button'] = update_ok_button
+            update_dialog_buttons = self.dialog_renderer.draw_update_status_dialog(self.update_info)
+            result['update_dialog_buttons'] = update_dialog_buttons
         
         # Temp message overlay - alleen als GEEN dialogs open zijn
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
