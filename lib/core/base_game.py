@@ -1416,6 +1416,11 @@ class BaseGame(ABC):
             return
         if self.gui.events.handle_depth_slider_click(pos, sliders.get('depth')):
             return
+        # Checkers AI sliders
+        if self.gui.events.handle_ai_difficulty_slider_click(pos, sliders.get('ai_difficulty')):
+            return
+        if self.gui.events.handle_ai_think_time_slider_click(pos, sliders.get('ai_think_time')):
+            return
         
         # OK button
         if self.gui.handle_ok_click(pos, ok_button):

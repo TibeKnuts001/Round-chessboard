@@ -415,6 +415,30 @@ class EventHandlers:
         """Handle depth slider drag"""
         return self._handle_slider_drag(pos, slider_rect, 'depth', 'stockfish_depth', 5, 50)
     
+    # Checkers AI sliders
+    
+    def handle_ai_difficulty_slider_click(self, pos, slider_rect):
+        """Handle checkers AI difficulty slider click to start dragging"""
+        if self._handle_slider_click(pos, slider_rect, 'ai_difficulty'):
+            self._handle_slider_drag(pos, slider_rect, 'ai_difficulty', 'ai_difficulty', 1, 10)
+            return True
+        return False
+    
+    def handle_ai_difficulty_slider_drag(self, pos, slider_rect):
+        """Handle checkers AI difficulty slider drag"""
+        return self._handle_slider_drag(pos, slider_rect, 'ai_difficulty', 'ai_difficulty', 1, 10)
+    
+    def handle_ai_think_time_slider_click(self, pos, slider_rect):
+        """Handle checkers AI think time slider click to start dragging"""
+        if self._handle_slider_click(pos, slider_rect, 'ai_think_time'):
+            self._handle_slider_drag(pos, slider_rect, 'ai_think_time', 'ai_think_time', 500, 5000)
+            return True
+        return False
+    
+    def handle_ai_think_time_slider_drag(self, pos, slider_rect):
+        """Handle checkers AI think time slider drag"""
+        return self._handle_slider_drag(pos, slider_rect, 'ai_think_time', 'ai_think_time', 500, 5000)
+    
     # Dropdown handlers
     
     def handle_power_profile_dropdown_click(self, pos, dropdown_rect):
