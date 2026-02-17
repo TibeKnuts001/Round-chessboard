@@ -139,14 +139,21 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 
                 pygame.draw.rect(self.screen, color, (x, y, self.square_size, self.square_size))
     
-    def draw_highlights(self, highlighted_squares=None, last_move=None):
+    def draw_highlights(self, highlighted_squares=None, last_move=None, tutorial_squares=None):
         """
         Teken alleen highlights bovenop gecached board (voor efficiency)
         
         Args:
             highlighted_squares: Dict met 'destinations' en 'intermediate' keys
             last_move: Tuple (from_square, to_square, intermediate_list)
+            tutorial_squares: Dict van {square: (r, g, b)} voor tutorial mode
         """
+        if tutorial_squares is None:
+            tutorial_squares = {}
+        
+        # Convert tutorial_squares keys to lowercase for matching
+        tutorial_squares = {sq.lower(): color for sq, color in tutorial_squares.items()}
+        
         # Parse input
         if isinstance(highlighted_squares, dict):
             destinations = [sq.lower() for sq in highlighted_squares.get('destinations', [])]
@@ -175,7 +182,12 @@ class CheckersBoardRenderer(BaseBoardRenderer):
                 
                 # Teken overlay alleen als highlight nodig
                 overlay = None
-                if square_notation in intermediate:
+                if square_notation in tutorial_squares:
+                    # Tutorial mode: gebruik custom color
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    color = tutorial_squares[square_notation]
+                    overlay.fill((*color, 180))  # 70% transparency
+                elif square_notation in intermediate:
                     overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
                     overlay.fill(COLOR_INTERMEDIATE)
                 elif square_notation in destinations:

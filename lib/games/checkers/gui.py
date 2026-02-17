@@ -145,6 +145,7 @@ class CheckersGUI:
         self.active_sensor_states = {}
         self.dragging_slider = False  # Voor brightness slider drag
         self.dragging_stockfish_slider = False  # Voor AI skill slider (toekomstig gebruik)
+        self.tutorial_squares = {}  # Voor tutorial mode highlighting
         
         # Renderers (hergebruik van chess GUI infrastructure)
         self.board_renderer = CheckersBoardRenderer(
@@ -244,10 +245,10 @@ class CheckersGUI:
             last_move = (self.last_move_from, self.last_move_to, self.last_move_intermediate)
         
         # Teken alleen highlights/selection bovenop board_surface
-        if highlights or last_move:
+        if highlights or last_move or self.tutorial_squares:
             temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.board_surface
-            self.board_renderer.draw_highlights(highlighted_squares=highlights, last_move=last_move)
+            self.board_renderer.draw_highlights(highlighted_squares=highlights, last_move=last_move, tutorial_squares=self.tutorial_squares)
             self.board_renderer.screen = temp_screen
     
     def draw_coordinates(self):
@@ -410,7 +411,6 @@ class CheckersGUI:
         # Voeg undo_button toe aan result
         result['undo_button'] = self.undo_button
         
-        pygame.display.flip()
         return result
     
     def highlight_squares(self, squares):
