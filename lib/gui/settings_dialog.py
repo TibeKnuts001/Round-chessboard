@@ -275,22 +275,6 @@ class SettingsDialog:
         y_pos = content_y
         toggle_x = dialog_x + 50
         
-        # Show coordinates toggle
-        toggle_rect = UIWidgets.draw_toggle(
-            self.screen,
-            toggle_x,
-            y_pos,
-            settings.get('debug', {}).get('show_coordinates', True),
-            self.font_small
-        )
-        
-        label = self.font_small.render("Show coordinates (A-H, 1-8)", True, UIWidgets.COLOR_BLACK)
-        self.screen.blit(label, (toggle_rect.right + 15, y_pos + 8))
-        
-        result['toggles']['coordinates'] = toggle_rect
-        
-        y_pos += 55
-        
         # Debug sensors toggle
         debug_toggle_rect = UIWidgets.draw_toggle(
             self.screen,

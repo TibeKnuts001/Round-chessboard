@@ -218,9 +218,8 @@ class ChessGUI:
             temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.cached_board
             
-            # Teken grid en coordinaten op cache (static, 1x)
+            # Teken grid op cache (static, 1x)
             self.board_renderer.draw_board_grid({}, None, set())
-            self.board_renderer.draw_coordinates()
             
             self.board_renderer.screen = temp_screen
         
@@ -233,10 +232,6 @@ class ChessGUI:
             self.board_renderer.screen = self.board_surface
             self.board_renderer.draw_highlights(self.highlighted_squares, self.selected_piece_from, self.capture_squares, self.tutorial_squares)
             self.board_renderer.screen = temp_screen
-    
-    def draw_coordinates(self):
-        """Teken coördinaten - nu in cached board, skip deze call"""
-        pass  # Coordinaten zitten al in cached board
     
     def draw_pieces(self):
         """Teken schaakstukken op board_surface - gebruik cache"""

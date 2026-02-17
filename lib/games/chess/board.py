@@ -113,37 +113,6 @@ class ChessBoardRenderer(BaseBoardRenderer):
         """Converteer row/col naar chess notatie (A1-H8)"""
         return f"{chr(65 + col)}{8 - row}"
     
-    def draw_coordinates(self):
-        """Teken chess coördinaten (A-H, 1-8)"""
-        for i in range(8):
-            # Files (A-H) onderaan op laatste rij
-            letter = chr(65 + i)
-            x = i * self.square_size + self.square_size - 15
-            y = 7 * self.square_size + self.square_size - 20
-            
-            # Teken zwarte outline (rond de tekst)
-            for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1), (-1,0), (1,0), (0,-1), (0,1)]:
-                outline = self.font_small.render(letter, True, self.COLOR_BLACK)
-                self.screen.blit(outline, (x + dx, y + dy))
-            
-            # Teken witte tekst
-            label = self.font_small.render(letter, True, self.COLOR_WHITE)
-            self.screen.blit(label, (x, y))
-            
-            # Ranks (1-8) links op eerste kolom
-            number = str(8 - i)
-            nx = 5
-            ny = i * self.square_size + 5
-            
-            # Teken zwarte outline
-            for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1), (-1,0), (1,0), (0,-1), (0,1)]:
-                outline = self.font_small.render(number, True, self.COLOR_BLACK)
-                self.screen.blit(outline, (nx + dx, ny + dy))
-            
-            # Teken witte tekst
-            label = self.font_small.render(number, True, self.COLOR_WHITE)
-            self.screen.blit(label, (nx, ny))
-    
     def draw_pieces(self, board):
         """
         Teken chess pieces met PNG images

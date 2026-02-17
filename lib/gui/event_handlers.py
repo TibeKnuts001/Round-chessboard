@@ -105,17 +105,6 @@ class EventHandlers:
     
     # Toggle handlers
     
-    def handle_toggle_click(self, pos, toggle_rect):
-        """Handle klik op show coordinates toggle switch"""
-        if toggle_rect and toggle_rect.collidepoint(pos):
-            # Toggle tijdelijk (niet permanent opslaan)
-            if not self.gui.temp_settings:
-                self.gui.temp_settings = self.gui.settings.get_temp_copy()
-            current_value = Settings.get_from_dict(self.gui.temp_settings, 'show_coordinates', True)
-            Settings.set_in_dict(self.gui.temp_settings, 'show_coordinates', not current_value)
-            return True
-        return False
-    
     def handle_debug_toggle_click(self, pos, toggle_rect):
         """Handle klik op debug toggle switch"""
         if toggle_rect and toggle_rect.collidepoint(pos):

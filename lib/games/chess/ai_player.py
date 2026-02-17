@@ -94,8 +94,6 @@ class ComputerPlayer:
             self.gui.draw_board()
             self.gui.draw_pieces()
             self.gui.draw_debug_overlays()
-            if self.gui.settings.get('show_coordinates', True, section='debug'):
-                self.gui.draw_coordinates()
             self.gui.draw_sidebar()
             
             # Teken "thinking" overlay

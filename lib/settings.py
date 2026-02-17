@@ -6,7 +6,6 @@ Centrale configuratie voor het hele chess project.
 Beheert persistente instellingen via JSON file storage.
 
 Instellingen:
-- show_coordinates: Toon A-H/1-8 randen op bord (bool)
 - debug_sensors: Enable sensor detection overlay (bool)
 - vs_computer: Speel tegen Stockfish AI (bool)
 - stockfish_skill_level: AI moeilijkheid 0-20 (int)
@@ -63,7 +62,6 @@ class Settings:
             'sound_effects': True,  # Game sound effects (check, checkmate, mismatch)
         },
         'debug': {
-            'show_coordinates': True,
             'debug_sensors': False,
             'validate_board_state': False,
         },
@@ -92,7 +90,6 @@ class Settings:
         # General
         'screensaver_audio': 'general',
         # Debug
-        'show_coordinates': 'debug',
         'debug_sensors': 'debug',
         'validate_board_state': 'debug',
         # Chess

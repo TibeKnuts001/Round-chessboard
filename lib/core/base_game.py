@@ -653,8 +653,6 @@ class BaseGame(ABC):
                         self.gui.draw_board()
                         self.gui.draw_pieces()
                         self.gui.draw_debug_overlays()
-                        if self.gui.settings.get('show_coordinates', True):
-                            self.gui.draw_coordinates()
                         self.gui.draw_sidebar()
                         pygame.display.flip()
                         
@@ -1401,8 +1399,6 @@ class BaseGame(ABC):
                                 self.gui.draw_board()
                                 self.gui.draw_pieces()
                                 self.gui.draw_debug_overlays()
-                                if self.gui.settings.get('show_coordinates', True):
-                                    self.gui.draw_coordinates()
                                 self.gui.draw_sidebar()
                                 pygame.display.flip()
                                 self.make_computer_move()
@@ -1586,8 +1582,6 @@ class BaseGame(ABC):
             return
         
         # Toggle clicks
-        if self.gui.events.handle_toggle_click(pos, toggles.get('coordinates')):
-            return
         if self.gui.events.handle_vs_computer_toggle_click(pos, toggles.get('vs_computer')):
             return
         if self.gui.events.handle_strict_touch_move_toggle_click(pos, toggles.get('strict_touch_move')):

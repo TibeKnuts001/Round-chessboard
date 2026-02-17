@@ -221,10 +221,8 @@ class CheckersGUI:
             temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.cached_board
             
-            # Teken grid en coordinaten op cache (static, 1x)
+            # Teken grid op cache (static, 1x)
             self.board_renderer.draw_board(highlighted_squares={'destinations': [], 'intermediate': []}, last_move=None)
-            if self.settings.get('show_coordinates', True, section='debug'):
-                self.board_renderer.draw_coordinates()
             
             self.board_renderer.screen = temp_screen
         
@@ -252,10 +250,6 @@ class CheckersGUI:
             self.board_renderer.screen = self.board_surface
             self.board_renderer.draw_highlights(highlighted_squares=highlights, last_move=last_move, tutorial_squares=self.tutorial_squares)
             self.board_renderer.screen = temp_screen
-    
-    def draw_coordinates(self):
-        """Teken coördinaten - nu in cached board, skip deze call"""
-        pass  # Coordinaten zitten al in cached board
     
     def draw_pieces(self):
         """Teken checkers pieces - gebruik cache"""
