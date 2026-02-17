@@ -97,6 +97,39 @@ class BaseSidebarRenderer:
         UIWidgets.draw_button(self.screen, settings_button, "Settings", self.font_small, is_primary=False)
         UIWidgets.draw_button(self.screen, exit_button, "Exit", self.font_small, is_primary=False, is_danger=True)
     
+    def draw_update_notification(self, update_available=False, version_info=""):
+        """
+        Teken update beschikbaar notificatie boven de buttons
+        
+        Args:
+            update_available: Of er een update beschikbaar is
+            version_info: Versie info string
+            
+        Returns:
+            Rect van de update notificatie (voor click detection) of None
+        """
+        if not update_available:
+            return None
+        
+        # Positie boven de buttons (buttons staan rond y=screen_height - 170)
+        y_pos = self.screen_height - 190
+        x_pos = self.board_size + 20
+        width = self.sidebar_width - 40
+        height = 35
+        
+        # Teken een lichte background box
+        box_rect = pygame.Rect(x_pos, y_pos, width, height)
+        pygame.draw.rect(self.screen, (255, 250, 205), box_rect, border_radius=8)  # Light yellow
+        pygame.draw.rect(self.screen, (255, 165, 0), box_rect, width=2, border_radius=8)  # Orange border
+        
+        # Teken tekst
+        text = "🔔 Update available"
+        text_surf = self.font_small.render(text, True, (200, 100, 0))  # Dark orange
+        text_rect = text_surf.get_rect(center=(x_pos + width // 2, y_pos + height // 2))
+        self.screen.blit(text_surf, text_rect)
+        
+        return box_rect
+    
     def draw_text_line(self, text, y_offset, bold=False):
         """
         Teken een regel tekst

@@ -297,14 +297,25 @@ class CheckersGUI:
     
     def draw_sidebar(self, game_started=False):
         """Teken sidebar (hergebruikt SidebarRenderer)"""
-        self.sidebar_renderer.draw_sidebar(
+        # Get update info from game instance if available
+        update_available = False
+        update_version_info = ""
+        if hasattr(self, '_game_instance') and self._game_instance:
+            update_available = self._game_instance.update_available
+            update_version_info = self._game_instance.update_version_info
+        
+        update_rect = self.sidebar_renderer.draw_sidebar(
             self.engine,
             self.new_game_button,
             self.exit_button,
             self.settings_button,
             self.undo_button,
-            game_started=game_started
+            game_started=game_started,
+            update_available=update_available,
+            update_version_info=update_version_info
         )
+        
+        return update_rect
     
     def draw_settings_dialog(self):
         """Teken settings dialog met checkers-specifieke tabs (Gameplay + AI)"""
@@ -360,7 +371,7 @@ class CheckersGUI:
         self.screen.blit(rotated_board, (0, 0))
         
         # Teken sidebar (normaal, niet geroteerd)
-        self.draw_sidebar(game_started=game_started)
+        update_rect = self.draw_sidebar(game_started=game_started)
         
         # Dialogs
         result = {}
@@ -413,8 +424,9 @@ class CheckersGUI:
                 else:
                     UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='warning')
         
-        # Voeg undo_button toe aan result
+        # Voeg undo_button en update_rect toe aan result
         result['undo_button'] = self.undo_button
+        result['update_notification_rect'] = update_rect
         
         return result
     

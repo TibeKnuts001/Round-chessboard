@@ -18,7 +18,7 @@ class ChessSidebarRenderer(BaseSidebarRenderer):
         super().__init__(screen, board_size, sidebar_width, screen_height, font, font_small)
         self.piece_images = piece_images
     
-    def draw_sidebar(self, engine, new_game_button, exit_button, settings_button, undo_button, game_started=False):
+    def draw_sidebar(self, engine, new_game_button, exit_button, settings_button, undo_button, game_started=False, update_available=False, update_version_info=""):
         """Teken chess sidebar"""
         # Background
         self.draw_background()
@@ -76,10 +76,15 @@ class ChessSidebarRenderer(BaseSidebarRenderer):
         x_pos = self.board_size + 20
         y_offset = self._draw_captured_with_counts(captured['white'], x_pos, y_offset)
         
+        # Update notification (boven buttons)
+        update_rect = self.draw_update_notification(update_available, update_version_info)
+        
         # Buttons
         # Check of er zetten zijn om ongedaan te maken (move_stack heeft items)
         can_undo = len(engine.board.move_stack) > 0
         self.draw_buttons(new_game_button, exit_button, settings_button, undo_button, game_started=game_started, can_undo=can_undo)
+        
+        return update_rect
     
     def _draw_captured_with_counts(self, pieces, x_start, y_start):
         """Teken captured pieces met count nummers"""

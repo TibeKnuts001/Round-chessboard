@@ -106,6 +106,11 @@ class BaseGame(ABC):
         # Sound Manager voor game sound effects
         self.sound_manager = SoundManager(self.gui.settings)
         
+        # Update checking - check in background bij startup
+        self.update_available = False
+        self.update_version_info = ""
+        self._start_update_check()
+        
         print(f"{self.__class__.__name__} klaar!")
     
     @abstractmethod
@@ -1290,6 +1295,13 @@ class BaseGame(ABC):
         skip_setup_no_button = gui_result.get('skip_setup_no')
         undo_yes_button = gui_result.get('undo_yes')
         undo_no_button = gui_result.get('undo_no')
+        update_notification_rect = gui_result.get('update_notification_rect')
+        
+        # Update notification click (open update dialog)
+        if update_notification_rect and update_notification_rect.collidepoint(pos):
+            print("Update notification clicked - showing update dialog")
+            self._check_for_updates()
+            return True
         
         # Check if tutorial is active and click is on board
         if self.tutorial_active:
@@ -2283,6 +2295,67 @@ class BaseGame(ABC):
             }
         
         self.screen_dirty = True
+    
+    def _start_update_check(self):
+        """Start background update check bij startup"""
+        import threading
+        
+        print("Starting background update check...")
+        
+        def check_updates_background():
+            """Background thread voor update check"""
+            import subprocess
+            import os
+            
+            try:
+                # Get script directory
+                script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                update_script = os.path.join(script_dir, 'update.sh')
+                
+                print(f"Update check: Looking for {update_script}")
+                
+                # Check if update script exists
+                if not os.path.exists(update_script):
+                    print("Update check: update.sh not found, skipping")
+                    return
+                
+                print("Update check: Running update script with --check-only")
+                
+                # Run update script with check-only mode
+                result = subprocess.run(
+                    ['/bin/bash', update_script, '--check-only'],
+                    cwd=script_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                output = result.stdout + result.stderr
+                print(f"Update check: Exit code {result.returncode}")
+                
+                # Exit code 1 means update available
+                if result.returncode == 1 and 'Update available' in output:
+                    # Extract version info
+                    for line in output.split('\n'):
+                        if 'Update available:' in line:
+                            self.update_version_info = line.split(':', 1)[1].strip()
+                            break
+                    
+                    self.update_available = True
+                    self.screen_dirty = True
+                    print(f"✓ Update available: {self.update_version_info}")
+                elif result.returncode == 0:
+                    print("✓ Already up to date")
+                else:
+                    print(f"Update check completed with code {result.returncode}")
+                    
+            except Exception as e:
+                # Silent fail - don't interrupt startup
+                print(f"Background update check failed: {e}")
+        
+        # Start check in background thread
+        thread = threading.Thread(target=check_updates_background, daemon=True)
+        thread.start()
     
     def _perform_update(self):
         """Perform actual update"""

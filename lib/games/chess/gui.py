@@ -269,14 +269,25 @@ class ChessGUI:
     
     def draw_sidebar(self, game_started=False):
         """Teken sidebar"""
-        self.sidebar_renderer.draw_sidebar(
+        # Get update info from game instance if available
+        update_available = False
+        update_version_info = ""
+        if hasattr(self, '_game_instance') and self._game_instance:
+            update_available = self._game_instance.update_available
+            update_version_info = self._game_instance.update_version_info
+        
+        update_rect = self.sidebar_renderer.draw_sidebar(
             self.engine,
             self.new_game_button,
             self.exit_button,
             self.settings_button,
             self.undo_button,
-            game_started=game_started
+            game_started=game_started,
+            update_available=update_available,
+            update_version_info=update_version_info
         )
+        
+        return update_rect
     
     def draw_settings_dialog(self):
         """Teken settings dialog met chess-specifieke tabs (Gameplay + AI)"""
@@ -500,7 +511,7 @@ class ChessGUI:
         self.screen.blit(rotated_board, (0, 0))
         
         # Teken sidebar (normaal, niet geroteerd)
-        self.draw_sidebar(game_started=game_started)
+        update_rect = self.draw_sidebar(game_started=game_started)
         
         # Teken settings dialog indien nodig
         ok_button = None
@@ -632,7 +643,8 @@ class ChessGUI:
             'undo_yes': undo_yes_button,
             'undo_no': undo_no_button,
             'promotion_buttons': promotion_buttons if self.show_promotion_dialog else {},
-            'update_dialog_buttons': update_dialog_buttons
+            'update_dialog_buttons': update_dialog_buttons,
+            'update_notification_rect': update_rect
         }
     
     def handle_settings_click(self, pos):
