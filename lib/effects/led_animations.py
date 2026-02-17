@@ -66,6 +66,14 @@ def hsv_to_rgb(h, s, v):
 class LEDAnimator:
     """Manager voor LED animatie effecten"""
     
+    # LED rings: concentrische cirkels van binnen naar buiten
+    RINGS = {
+        3: [19, 3, 35, 51],  # Centrum: D4, D5, E4, E5
+        2: [22, 18, 7, 6, 23, 2, 34, 55, 38, 39, 50, 54],  # Ring 2
+        1: [25, 21, 17, 11, 10, 9, 26, 5, 27, 1, 33, 59, 37, 58, 41, 42, 43, 49, 53, 57],  # Ring 1
+        0: [28, 24, 20, 16, 15, 14, 13, 12, 29, 8, 30, 4, 31, 0, 32, 63, 36, 62, 40, 61, 44, 45, 46, 47, 48, 52, 56, 60]  # Buitenste
+    }
+    
     def __init__(self, led_controller):
         """
         Initialiseer animator
@@ -85,6 +93,31 @@ class LEDAnimator:
                 'func': self._rainbow_wave,
                 'speed': 0.05,
                 'duration': 15
+            },
+            'rainbow_ripple': {
+                'func': self._rainbow_ripple,
+                'speed': 0.03,
+                'duration': 15
+            },
+            'pulse_rings': {
+                'func': self._pulse_rings,
+                'speed': 0.04,
+                'duration': 12
+            },
+            'ring_chase': {
+                'func': self._ring_chase,
+                'speed': 0.08,
+                'duration': 15
+            },
+            'ring_chase_reverse': {
+                'func': self._ring_chase_reverse,
+                'speed': 0.08,
+                'duration': 15
+            },
+            'expanding_pulse': {
+                'func': self._expanding_pulse,
+                'speed': 0.05,
+                'duration': 12
             },
             'breathing': {
                 'func': self._breathing,
@@ -186,6 +219,145 @@ class LEDAnimator:
             hue = (i * 360 / 64 + time.time() * 100) % 360
             r, g, b = hsv_to_rgb(hue, 1.0, 0.8)  # Brightness 0.8 voor minder fel
             self.leds.set_led(i, r, g, b, 0)
+        
+        self.leds.show()
+        time.sleep(config['speed'])
+    
+    def _rainbow_ripple(self, config):
+        """Regenboog ripple effect vanuit centrum naar buiten"""
+        offset = time.time() * 100  # Animatie snelheid
+        
+        # Loop door rings van binnen (3) naar buiten (0)
+        for ring_num in range(4):
+            # Bereken hue op basis van ring nummer en tijd
+            # Ring 3 (centrum) krijgt de "start" hue, ring 0 (buiten) is 270° verder
+            hue = (offset + ring_num * 90) % 360
+            
+            # Brightness fade van binnen (helder) naar buiten (minder helder)
+            brightness = 0.5 + (3 - ring_num) * 0.1  # 0.8 centrum, 0.5 buiten
+            
+            r, g, b = hsv_to_rgb(hue, 1.0, brightness)
+            
+            # Zet alle LEDs in deze ring op dezelfde kleur
+            for led_num in self.RINGS[ring_num]:
+                self.leds.set_led(led_num, r, g, b, 0)
+        
+        self.leds.show()
+        time.sleep(config['speed'])
+    
+    def _pulse_rings(self, config):
+        """Pulserende ringen van binnen naar buiten"""
+        t = time.time() * 2
+        
+        # Loop door alle rings
+        for ring_num in range(4):
+            # Bereken fase voor deze ring (elke ring iets vertraagd)
+            phase = (t - ring_num * 0.5) % 2
+            
+            # Brightness pulse (0 -> 1 -> 0)
+            if phase < 1:
+                brightness = phase
+            else:
+                brightness = 2 - phase
+            
+            brightness = brightness * 0.7  # Max brightness
+            
+            # Kleur verandert langzaam per ring
+            hue = (ring_num * 60 + t * 20) % 360
+            r, g, b = hsv_to_rgb(hue, 1.0, brightness)
+            
+            # Zet alle LEDs in ring
+            for led_num in self.RINGS[ring_num]:
+                self.leds.set_led(led_num, r, g, b, 0)
+        
+        self.leds.show()
+        time.sleep(config['speed'])
+    
+    def _ring_chase(self, config):
+        """Kleur jaagt door de ringen heen"""
+        t = time.time() * 3
+        
+        # Welke ring is actief (0-3)
+        active_ring = int(t) % 4
+        
+        # Fade effect tussen ringen
+        fade = t % 1.0
+        
+        for ring_num in range(4):
+            if ring_num == active_ring:
+                # Hoofdring: helder
+                brightness = 0.8 * (1 - fade * 0.5)
+            elif ring_num == (active_ring + 1) % 4:
+                # Volgende ring: fade in
+                brightness = 0.4 * fade
+            else:
+                # Andere ringen: uit
+                brightness = 0
+            
+            # Elke ring andere kleur
+            hue = (ring_num * 90) % 360
+            r, g, b = hsv_to_rgb(hue, 1.0, brightness)
+            
+            for led_num in self.RINGS[ring_num]:
+                self.leds.set_led(led_num, r, g, b, 0)
+        
+        self.leds.show()
+        time.sleep(config['speed'])
+    
+    def _ring_chase_reverse(self, config):
+        """Kleur jaagt door de ringen heen (van buiten naar binnen)"""
+        t = time.time() * 3
+        
+        # Welke ring is actief (3-0, van buiten naar binnen)
+        active_ring = 3 - (int(t) % 4)
+        
+        # Fade effect tussen ringen
+        fade = t % 1.0
+        
+        for ring_num in range(4):
+            if ring_num == active_ring:
+                # Hoofdring: helder
+                brightness = 0.8 * (1 - fade * 0.5)
+            elif ring_num == (active_ring - 1) % 4:
+                # Volgende ring (naar binnen): fade in
+                brightness = 0.4 * fade
+            else:
+                # Andere ringen: uit
+                brightness = 0
+            
+            # Elke ring andere kleur
+            hue = (ring_num * 90) % 360
+            r, g, b = hsv_to_rgb(hue, 1.0, brightness)
+            
+            for led_num in self.RINGS[ring_num]:
+                self.leds.set_led(led_num, r, g, b, 0)
+        
+        self.leds.show()
+        time.sleep(config['speed'])
+    
+    def _expanding_pulse(self, config):
+        """Puls die expandeert van centrum naar buiten"""
+        t = time.time() * 2
+        pulse = t % 2  # 0-2 cyclus
+        
+        self.leds.clear()
+        
+        # Ring activeren op basis van pulse positie
+        for ring_num in range(3, -1, -1):  # 3 -> 0 (binnen naar buiten)
+            # Bereken afstand van pulse tot deze ring
+            ring_time = 3 - ring_num  # 0, 1, 2, 3
+            distance = abs(pulse - ring_time * 0.5)
+            
+            # Brightness op basis van afstand
+            if distance < 0.3:
+                brightness = 0.8 * (1 - distance / 0.3)
+                
+                # Kleur verandert met tijd
+                hue = (t * 50 + ring_num * 30) % 360
+                r, g, b = hsv_to_rgb(hue, 1.0, brightness)
+                
+                for led_num in self.RINGS[ring_num]:
+                    self.leds.set_led(led_num, r, g, b, 0)
         
         self.leds.show()
         time.sleep(config['speed'])
