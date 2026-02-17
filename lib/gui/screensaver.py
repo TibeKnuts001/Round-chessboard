@@ -11,6 +11,7 @@ import pygame
 import math
 import os
 import random
+import glob
 
 
 def get_raspberry_pi_version():
@@ -139,7 +140,32 @@ class Screensaver:
         
         # Audio
         self.audio_playing = False
+        self.audio_folder = "assets/audio/screensaver"
+        self.audio_extensions = ['*.mp3', '*.wav', '*.ogg', '*.flac', '*.m4a']
         
+    def _play_random_audio(self):
+        """Play a random audio file from screensaver folder"""
+        try:
+            # Find all audio files
+            audio_files = []
+            for ext in self.audio_extensions:
+                audio_files.extend(glob.glob(os.path.join(self.audio_folder, ext)))
+            
+            if not audio_files:
+                print(f"✗ Geen audio bestanden gevonden in {self.audio_folder}")
+                return False
+            
+            # Randomly select one audio file
+            selected_audio = random.choice(audio_files)
+            print(f"Screensaver audio gekozen: {os.path.basename(selected_audio)}")
+            
+            pygame.mixer.music.load(selected_audio)
+            pygame.mixer.music.play()  # Play once (not looping)
+            return True
+        except Exception as e:
+            print(f"✗ Kon screensaver audio niet laden: {e}")
+            return False
+    
     def start_audio(self):
         """Start screensaver audio"""
         # Check of audio enabled is in settings
@@ -150,10 +176,9 @@ class Screensaver:
         try:
             if not self.audio_playing:
                 pygame.mixer.init()
-                pygame.mixer.music.load("assets/audio/screensaver.mp3")
-                pygame.mixer.music.play(-1)  # Loop forever
-                self.audio_playing = True
-                print("✓ Screensaver audio gestart")
+                if self._play_random_audio():
+                    self.audio_playing = True
+                    print("✓ Screensaver audio gestart")
         except Exception as e:
             print(f"✗ Kon screensaver audio niet starten: {e}")
     
@@ -174,6 +199,13 @@ class Screensaver:
         Args:
             dt: Delta time since last frame (seconds)
         """
+        # Check if audio finished and play next random song
+        if self.audio_playing and self.settings.get('screensaver_audio', True, section='general'):
+            if not pygame.mixer.music.get_busy():
+                # Current song finished, play a new random one
+                print("Screensaver audio voltooid, selecteer nieuwe track...")
+                self._play_random_audio()
+        
         # Skip updates als animaties niet enabled zijn
         if not self.animations_enabled:
             return
