@@ -123,7 +123,7 @@ class BaseSidebarRenderer:
         pygame.draw.rect(self.screen, (255, 165, 0), box_rect, width=2, border_radius=8)  # Orange border
         
         # Teken tekst
-        text = "🔔 Update available"
+        text = "Update available"
         text_surf = self.font_small.render(text, True, (200, 100, 0))  # Dark orange
         text_rect = text_surf.get_rect(center=(x_pos + width // 2, y_pos + height // 2))
         self.screen.blit(text_surf, text_rect)

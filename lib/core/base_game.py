@@ -2402,6 +2402,9 @@ class BaseGame(ABC):
                         'Please restart the application'
                     ]
                 }
+                # Reset update notification
+                self.update_available = False
+                self.update_version_info = ""
             else:
                 # Error
                 error_lines = [line.strip() for line in output.split('\n') if line.strip() and not line.startswith('#')][-3:]
