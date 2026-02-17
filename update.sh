@@ -83,11 +83,12 @@ if [ -f "settings.json" ]; then
 fi
 
 echo "Pulling changes..."
-git pull origin $BRANCH
+git fetch origin
+git reset --hard origin/$BRANCH
 
 # Clean up old/removed files (but keep settings.json, venv, etc.)
 echo "Cleaning up old files..."
-git clean -fd -e settings.json -e venv -e .vscode
+git clean -fd -e settings.json -e settings.json.bak -e venv -e .vscode
 
 # Restore settings if backup exists
 if [ -f "settings.json.bak" ]; then
