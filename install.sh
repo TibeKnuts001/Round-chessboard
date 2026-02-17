@@ -14,6 +14,7 @@ echo "1. Making scripts executable..."
 chmod +x run.sh
 chmod +x chess.sh
 chmod +x checkers.sh
+chmod +x update.sh
 chmod +x install/install_venv.sh
 chmod +x install/install_splash.sh
 chmod +x install/install_launcher.sh
