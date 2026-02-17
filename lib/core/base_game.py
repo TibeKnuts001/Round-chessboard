@@ -83,6 +83,7 @@ class BaseGame(ABC):
         self.screen_dirty = True  # Flag: herteken nodig (CPU optimalisatie)
         self.last_gui_result = {}  # Cache laatste gui_result voor button detection
         self.ai_move_pending = None  # Track AI move execution: {'from': pos, 'to': pos, 'intermediate': [], 'piece_removed': False}
+        self.castling_pending = None  # Track castling rook movement: {'rook_from': pos, 'rook_to': pos, 'rook_removed': False}
         
         # LED Animator voor idle effects
         self.led_animator = LEDAnimator(self.leds)
@@ -328,6 +329,25 @@ class BaseGame(ABC):
         """
         print(f"\nStuk weggehaald van {position}")
         
+        # Debug castling pending state
+        if self.castling_pending:
+            print(f"  DEBUG: castling_pending.rook_from = '{self.castling_pending.get('rook_from')}'")
+            print(f"  DEBUG: position = '{position}'")
+            print(f"  DEBUG: Match check = {self.castling_pending.get('rook_from', '').lower() == position.lower()}")
+        
+        # Check of dit castling rook removal is (case-insensitive)
+        if self.castling_pending and self.castling_pending.get('rook_from', '').lower() == position.lower():
+            print(f"  Castling rook opgepakt - markeer als rook_removed")
+            self.castling_pending['rook_removed'] = True
+            return  # Skip normale handling
+        
+        # Als er een castling pending is maar dit is NIET de rook, blokkeer dan andere moves
+        if self.castling_pending:
+            print(f"  Castling pending - speler mag geen andere zet doen! Verplaats eerst de rook.")
+            self.sound_manager.play_mismatch()
+            self.show_temp_message("Please move the rook to complete castling!", duration=2000)
+            return  # Blokkeer andere moves
+        
         # Debug AI move pending state
         if self.ai_move_pending:
             print(f"  DEBUG: ai_move_pending.from = '{self.ai_move_pending.get('from')}'")
@@ -409,6 +429,46 @@ class BaseGame(ABC):
             position: Positie notatie waar stuk neergezet is
         """
         print(f"\nStuk neergezet op {position}")
+        
+        # Check of dit castling rook placement completion is (case-insensitive)
+        if (self.castling_pending and 
+            self.castling_pending.get('rook_removed')):
+            
+            rook_to_pos = self.castling_pending.get('rook_to', '').lower()
+            pos_lower = position.lower()
+            
+            # Check of dit de rook destination is
+            if rook_to_pos == pos_lower:
+                print(f"  Castling volledig uitgevoerd! Rook verplaatst naar {position}")
+                
+                # Toon witte LEDs voor voltooide castling (king + rook positions)
+                self.leds.clear()
+                rook_from = self.castling_pending.get('rook_from')
+                rook_to = self.castling_pending.get('rook_to')
+                
+                from_sensor = ChessMapper.chess_to_sensor(rook_from) if rook_from else None
+                to_sensor = ChessMapper.chess_to_sensor(rook_to) if rook_to else None
+                
+                if from_sensor is not None:
+                    self.leds.set_led(from_sensor, 100, 100, 100, 20)  # WIT
+                if to_sensor is not None:
+                    self.leds.set_led(to_sensor, 100, 100, 100, 20)  # WIT
+                
+                self.leds.show()
+                
+                # Clear castling_pending
+                self.castling_pending = None
+                if hasattr(self, '_castling_leds_set'):
+                    self._castling_leds_set = False
+                print("  castling_pending cleared - speler kan weer bewegen")
+                return  # Skip normale handling
+            else:
+                # Rook neergezet op verkeerde positie
+                print(f"  WAARSCHUWING: Rook neergezet op {position}, maar castling verwacht {rook_to_pos}")
+                self.sound_manager.play_mismatch()
+                self.show_temp_message(f"Rook must go to {self.castling_pending.get('rook_to')}!", duration=2000)
+                # Laat rook daar - speler moet het naar de juiste plek verplaatsen
+                return  # Skip normale handling
         
         # Debug AI move pending state
         if self.ai_move_pending:
@@ -521,6 +581,18 @@ class BaseGame(ABC):
                     self.gui.promotion_choice = None
                     self.screen_dirty = True
                     return
+                
+                # Check if this is a castling move (intermediate contains rook positions)
+                if move_success and move_intermediate and len(move_intermediate) == 2:
+                    # This is castling - set castling_pending to track rook movement
+                    rook_from, rook_to = move_intermediate
+                    self.castling_pending = {
+                        'rook_from': rook_from,
+                        'rook_to': rook_to,
+                        'rook_removed': False
+                    }
+                    print(f"  Castling detected! Rook must move: {rook_from} -> {rook_to}")
+                    print(f"  castling_pending = {self.castling_pending}")
             else:
                 move_success = bool(move_result)
                 move_intermediate = []
@@ -744,11 +816,12 @@ class BaseGame(ABC):
                         self.screen_dirty = True
                 
                 # Valideer board state (NA sensor handling, zodat selected_square up-to-date is)
-                # Alleen valideren als: spel gestart, setting enabled, geen actieve move, EN geen AI move pending
+                # Alleen valideren als: spel gestart, setting enabled, geen actieve move, EN geen AI move pending, EN geen castling pending
                 if (self.game_started and 
                     not self.selected_square and 
                     not self.invalid_return_position and
                     not self.ai_move_pending and
+                    not self.castling_pending and
                     self.gui.settings.get('validate_board_state', False, section='debug')):
                     old_paused_state = self.game_paused
                     self.board_mismatch_positions = self.validate_board_state(current_sensors)
@@ -788,6 +861,31 @@ class BaseGame(ABC):
     
     def _update_led_animations(self):
         """Update LED blink animaties voor geselecteerd veld en warnings"""
+        # Check eerst of er een castling rook movement pending is (heeft hoogste prioriteit)
+        if self.castling_pending and not self.board_mismatch_positions:
+            # Toon castling rook move: blauw voor from, groen voor to (constant, geen blink)
+            if not hasattr(self, '_castling_leds_set') or not self._castling_leds_set:
+                rook_from = self.castling_pending.get('rook_from')
+                rook_to = self.castling_pending.get('rook_to')
+                
+                from_sensor = ChessMapper.chess_to_sensor(rook_from) if rook_from else None
+                to_sensor = ChessMapper.chess_to_sensor(rook_to) if rook_to else None
+                
+                self.leds.clear()
+                if from_sensor is not None:
+                    self.leds.set_led(from_sensor, 0, 0, 255, 0)  # BLAUW - pak rook op
+                if to_sensor is not None:
+                    self.leds.set_led(to_sensor, 0, 255, 0, 0)  # GROEN - verplaats rook naar hier
+                
+                self.leds.show()
+                self._castling_leds_set = True
+                print("  Castling rook LEDs gezet (blauw/groen)")
+            return
+        else:
+            # Clear flag als castling_pending niet meer bestaat
+            if hasattr(self, '_castling_leds_set'):
+                self._castling_leds_set = False
+        
         # Check eerst of er een AI move pending is (heeft prioriteit, maar alleen als geen board mismatches)
         if self.ai_move_pending and not self.board_mismatch_positions:
             # Toon AI move: blauw voor from, groen voor to (constant, geen blink)
@@ -1603,6 +1701,13 @@ class BaseGame(ABC):
         if self.ai_move_pending:
             self.ai_move_pending = None
             print("  ai_move_pending cleared")
+        
+        # Clear castling pending
+        if self.castling_pending:
+            self.castling_pending = None
+            if hasattr(self, '_castling_leds_set'):
+                self._castling_leds_set = False
+            print("  castling_pending cleared")
     
     def cleanup(self):
         """Cleanup resources"""
