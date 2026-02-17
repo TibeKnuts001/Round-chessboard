@@ -529,6 +529,7 @@ class ChessGUI:
         dropdown_items = []
         power_profiles = []
         screensaver_button = None
+        assisted_setup_button = None
         test_position_button = None
         tutorial_button = None
         check_updates_button = None
@@ -542,13 +543,10 @@ class ChessGUI:
             dropdown_items = settings_result.get('dropdown_items', [])
             power_profiles = settings_result.get('power_profiles', [])
             screensaver_button = settings_result.get('screensaver_button')
+            assisted_setup_button = settings_result.get('assisted_setup_button')
             test_position_button = settings_result.get('test_position_button')
             tutorial_button = settings_result.get('tutorial_button')
             check_updates_button = settings_result.get('check_updates_button')
-            power_profiles = settings_result.get('power_profiles', [])
-            screensaver_button = settings_result.get('screensaver_button')
-            test_position_button = settings_result.get('test_position_button')
-            tutorial_button = settings_result.get('tutorial_button')
             # Extract individual values for backwards compatibility
             toggle_rect = toggles.get('coordinates')
             debug_toggle_rect = toggles.get('debug_sensors')
@@ -580,8 +578,9 @@ class ChessGUI:
         # Teken skip setup step confirmation dialog indien nodig
         skip_setup_yes_button = None
         skip_setup_no_button = None
+        skip_setup_cancel_button = None
         if self.show_skip_setup_step_confirm:
-            skip_setup_yes_button, skip_setup_no_button = self.dialog_renderer.draw_skip_setup_step_dialog()
+            skip_setup_yes_button, skip_setup_no_button, skip_setup_cancel_button = self.dialog_renderer.draw_skip_setup_step_dialog()
         
         # Teken undo confirmation dialog indien nodig
         undo_yes_button = None
@@ -627,6 +626,7 @@ class ChessGUI:
             'dropdown_items': dropdown_items if self.show_settings else [],
             'power_profiles': power_profiles if self.show_settings else [],
             'screensaver_button': screensaver_button,
+            'assisted_setup_button': assisted_setup_button,
             'test_position_button': test_position_button,
             'tutorial_button': tutorial_button,
             'check_updates_button': check_updates_button,
@@ -640,6 +640,7 @@ class ChessGUI:
             'new_game_cancel': new_game_cancel_button,
             'skip_setup_yes': skip_setup_yes_button,
             'skip_setup_no': skip_setup_no_button,
+            'skip_setup_cancel': skip_setup_cancel_button,
             'undo_yes': undo_yes_button,
             'undo_no': undo_no_button,
             'promotion_buttons': promotion_buttons if self.show_promotion_dialog else {},

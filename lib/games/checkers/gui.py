@@ -390,9 +390,10 @@ class CheckersGUI:
             result['new_game_assisted'] = new_game_assisted_button
             result['new_game_cancel'] = new_game_cancel_button
         elif self.show_skip_setup_step_confirm:
-            skip_setup_yes_button, skip_setup_no_button = self.dialog_renderer.draw_skip_setup_step_dialog()
+            skip_setup_yes_button, skip_setup_no_button, skip_setup_cancel_button = self.dialog_renderer.draw_skip_setup_step_dialog()
             result['skip_setup_yes'] = skip_setup_yes_button
             result['skip_setup_no'] = skip_setup_no_button
+            result['skip_setup_cancel'] = skip_setup_cancel_button
         elif self.show_undo_confirm:
             undo_yes_button, undo_no_button = self.dialog_renderer.draw_undo_confirm_dialog()
             result['undo_yes'] = undo_yes_button

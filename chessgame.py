@@ -43,6 +43,50 @@ class ChessGame(BaseGame):
             {'name': 'Pawns', 'squares': ['A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2'], 'color': (255, 255, 255, 0), 'squares_black': ['A7', 'B7', 'C7', 'D7', 'E7', 'F7', 'G7', 'H7'], 'color_black': (200, 100, 0, 0)},
         ]
     
+    def _get_piece_name(self, piece):
+        """Get human-readable name for a chess piece"""
+        import chess
+        
+        if piece is None:
+            return "Piece"
+        
+        piece_names = {
+            chess.PAWN: "Pawn",
+            chess.KNIGHT: "Knight",
+            chess.BISHOP: "Bishop",
+            chess.ROOK: "Rook",
+            chess.QUEEN: "Queen",
+            chess.KING: "King"
+        }
+        
+        name = piece_names.get(piece.piece_type, "Piece")
+        color = "White" if piece.color else "Black"
+        return f"{color} {name}"
+    
+    def _get_piece_type(self, piece):
+        """Get piece type without color for a chess piece"""
+        import chess
+        
+        if piece is None:
+            return "Piece"
+        
+        piece_names = {
+            chess.PAWN: "Pawns",
+            chess.KNIGHT: "Knights",
+            chess.BISHOP: "Bishops",
+            chess.ROOK: "Rooks",
+            chess.QUEEN: "Queens",
+            chess.KING: "Kings"
+        }
+        
+        return piece_names.get(piece.piece_type, "Pieces")
+    
+    def _is_white_piece(self, piece):
+        """Check if chess piece is white"""
+        if piece is None:
+            return True
+        return piece.color  # True for white, False for black
+    
     def _create_ai(self):
         """Maak Stockfish AI als VS Computer enabled is"""
         # Check of worstfish mode aan staat

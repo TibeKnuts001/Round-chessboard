@@ -90,6 +90,7 @@ class SettingsDialog:
             'toggles': {},
             'dropdowns': {},
             'screensaver_button': None,  # Default None, wordt gezet in debug tab
+            'assisted_setup_button': None,  # Default None, wordt gezet in debug tab
             'tutorial_button': None,  # Default None, wordt gezet in general tab
             'check_updates_button': None  # Default None, wordt gezet in general tab
         }
@@ -337,6 +338,20 @@ class SettingsDialog:
         )
         
         result['screensaver_button'] = screensaver_button
+        
+        y_pos += 60
+        
+        # Assisted Setup button
+        assisted_setup_button_rect = pygame.Rect(button_x, y_pos, button_width, button_height)
+        assisted_setup_button = UIWidgets.draw_button(
+            self.screen,
+            assisted_setup_button_rect,
+            "Assisted Setup",
+            self.font_small,
+            is_primary=False
+        )
+        
+        result['assisted_setup_button'] = assisted_setup_button
         
         y_pos += 60
         

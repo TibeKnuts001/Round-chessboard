@@ -53,6 +53,28 @@ class CheckersGame(BaseGame):
             },
         ]
     
+    def _get_piece_name(self, piece):
+        """Get human-readable name for a checkers piece"""
+        if piece is None:
+            return "Piece"
+        
+        color = "White" if piece.color == "white" else "Black"
+        piece_type = "King" if piece.is_king else "Man"
+        return f"{color} {piece_type}"
+    
+    def _get_piece_type(self, piece):
+        """Get piece type without color for a checkers piece"""
+        if piece is None:
+            return "Pieces"
+        
+        return "Kings" if piece.is_king else "Men"
+    
+    def _is_white_piece(self, piece):
+        """Check if checkers piece is white"""
+        if piece is None:
+            return True
+        return piece.color == "white"
+    
     def _create_ai(self):
         """Maak AI als VS Computer enabled is"""
         # Check of we in checkers sectie zitten (niet chess)

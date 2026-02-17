@@ -788,8 +788,8 @@ class BaseGame(ABC):
                     dt = clock.get_time() / 1000.0  # Convert ms to seconds
                     self._update_tutorial(dt)
                 
-                # Update LED blink animatie (skip if tutorial active)
-                if not self.tutorial_active:
+                # Update LED blink animatie (skip if tutorial or assisted setup active)
+                if not self.tutorial_active and not self.gui.assisted_setup_mode:
                     self._update_led_animations()
                 
                 # Lees sensors
@@ -838,12 +838,13 @@ class BaseGame(ABC):
                         self.screen_dirty = True
                 
                 # Valideer board state (NA sensor handling, zodat selected_square up-to-date is)
-                # Alleen valideren als: spel gestart, setting enabled, geen actieve move, EN geen AI move pending, EN geen castling pending
+                # Alleen valideren als: spel gestart, setting enabled, geen actieve move, EN geen AI move pending, EN geen castling pending, EN geen assisted setup
                 if (self.game_started and 
                     not self.selected_square and 
                     not self.invalid_return_position and
                     not self.ai_move_pending and
                     not self.castling_pending and
+                    not self.gui.assisted_setup_mode and
                     self.gui.settings.get('validate_board_state', False, section='debug')):
                     old_paused_state = self.game_paused
                     self.board_mismatch_positions = self.validate_board_state(current_sensors)
@@ -1293,6 +1294,7 @@ class BaseGame(ABC):
         stop_game_no_button = gui_result.get('stop_game_no')
         skip_setup_yes_button = gui_result.get('skip_setup_yes')
         skip_setup_no_button = gui_result.get('skip_setup_no')
+        skip_setup_cancel_button = gui_result.get('skip_setup_cancel')
         undo_yes_button = gui_result.get('undo_yes')
         undo_no_button = gui_result.get('undo_no')
         update_notification_rect = gui_result.get('update_notification_rect')
@@ -1341,6 +1343,9 @@ class BaseGame(ABC):
                 self._advance_setup_step()
             elif self.gui.handle_skip_setup_no_click(pos, skip_setup_no_button):
                 pass  # Gewoon dialog sluiten en doorgaan met wachten
+            elif skip_setup_cancel_button and skip_setup_cancel_button.collidepoint(pos):
+                print("\nCancelling assisted setup...")
+                self._cancel_assisted_setup()
         
         # Promotion dialog
         elif hasattr(self.gui, 'show_promotion_dialog') and self.gui.show_promotion_dialog:
@@ -1517,6 +1522,7 @@ class BaseGame(ABC):
         toggles = gui_result.get('toggles', {})
         ok_button = gui_result.get('ok_button')
         screensaver_button = gui_result.get('screensaver_button')
+        assisted_setup_button = gui_result.get('assisted_setup_button')
         test_position_button = gui_result.get('test_position_button')
         tutorial_button = gui_result.get('tutorial_button')
         check_updates_button = gui_result.get('check_updates_button')
@@ -1565,6 +1571,14 @@ class BaseGame(ABC):
             self.screensaver_start_time = time.time()
             self.gui.show_settings = False
             self.gui.temp_settings = {}
+            return
+        
+        # Check assisted setup button
+        if assisted_setup_button and assisted_setup_button.collidepoint(pos):
+            print("Starting assisted setup from debug menu...")
+            self.gui.show_settings = False
+            self.gui.temp_settings = {}
+            self._start_assisted_setup()
             return
         
         # Tab clicks
@@ -1829,12 +1843,74 @@ class BaseGame(ABC):
         print(f"{self.__class__.__name__} afgesloten")
     
     def _start_assisted_setup(self):
-        """Start assisted setup mode"""
+        """Start assisted setup mode - analyzes current board state vs engine"""
         print("Starting assisted board setup...")
+        print("Analyzing current board state vs engine...")
+        
         self.gui.assisted_setup_mode = True
         self.gui.assisted_setup_step = 0
         self.gui.assisted_setup_waiting = True
-        self.assisted_setup_placed_squares = set()  # Track welke squares al geplaatst zijn
+        
+        # Read current sensors and validate against engine
+        current_sensors = self.read_sensors()
+        mismatches = self.validate_board_state(current_sensors)
+        
+        # Build steps based on mismatches
+        self.assisted_setup_steps = []
+        pieces_to_remove = []  # Sensor has piece but engine doesn't
+        pieces_to_place = []   # Engine has piece but sensor doesn't
+        
+        for pos in mismatches:
+            engine_piece = self.engine.get_piece_at(pos)
+            sensor_has_piece = current_sensors.get(pos, False)
+            
+            if sensor_has_piece and not engine_piece:
+                # Extra piece that shouldn't be there
+                pieces_to_remove.append(pos)
+                print(f"  {pos}: REMOVE (extra piece)")
+            elif engine_piece and not sensor_has_piece:
+                # Missing piece that should be there
+                piece_name = self._get_piece_name(engine_piece)
+                piece_type = self._get_piece_type(engine_piece)  # Type without color
+                pieces_to_place.append({
+                    'pos': pos, 
+                    'piece': engine_piece, 
+                    'name': piece_name,
+                    'type': piece_type
+                })
+                print(f"  {pos}: PLACE {piece_name}")
+        
+        # Create steps: first remove, then place (grouped by piece type, white and black together)
+        if pieces_to_remove:
+            self.assisted_setup_steps.append({
+                'type': 'remove',
+                'squares': pieces_to_remove
+            })
+        
+        # Group pieces to place by type (without color)
+        if pieces_to_place:
+            pieces_by_type = {}
+            for item in pieces_to_place:
+                piece_type = item['type']  # Use type without color
+                if piece_type not in pieces_by_type:
+                    pieces_by_type[piece_type] = []
+                pieces_by_type[piece_type].append(item)
+            
+            # Add a step for each piece type (white and black together)
+            for piece_type, items in pieces_by_type.items():
+                self.assisted_setup_steps.append({
+                    'type': 'place',
+                    'piece_type': piece_type,
+                    'pieces': items
+                })
+        
+        if not self.assisted_setup_steps:
+            print("Board is already correct!")
+            self.show_temp_message("Board is correct!", duration=3)
+            self._finish_assisted_setup()
+            return
+        
+        print(f"\nTotal steps: {len(self.assisted_setup_steps)}")
         
         # Clear AI move pending
         self.ai_move_pending = None
@@ -1850,126 +1926,154 @@ class BaseGame(ABC):
         # Default: geen setup (moet door subclass worden geïmplementeerd)
         return []
     
+    def _get_piece_name(self, piece):
+        """Get human-readable name for a piece (must be overridden by subclass)
+        
+        Args:
+            piece: Piece object from engine
+            
+        Returns:
+            str: Human-readable piece name (with color)
+        """
+        return "Piece"
+    
+    def _get_piece_type(self, piece):
+        """Get piece type without color (must be overridden by subclass)
+        
+        Args:
+            piece: Piece object from engine
+            
+        Returns:
+            str: Piece type without color (e.g., "Pawn", "Rook")
+        """
+        return "Piece"
+    
+    def _is_white_piece(self, piece):
+        """Check if piece is white (must be overridden by subclass)
+        
+        Args:
+            piece: Piece object from engine
+            
+        Returns:
+            bool: True if white, False if black
+        """
+        return True
+    
     def _show_current_setup_step(self):
         """Show current step in assisted setup"""
-        steps = self._get_setup_steps()
-        
-        if self.gui.assisted_setup_step >= len(steps):
-            # Setup compleet
+        if self.gui.assisted_setup_step >= len(self.assisted_setup_steps):
+            # Setup complete
             self._finish_assisted_setup()
             return
         
-        current_step = steps[self.gui.assisted_setup_step]
-        print(f"Setup step {self.gui.assisted_setup_step + 1}/{len(steps)}: Place {current_step['name']}")
+        current_step = self.assisted_setup_steps[self.gui.assisted_setup_step]
+        step_num = self.gui.assisted_setup_step + 1
+        total_steps = len(self.assisted_setup_steps)
         
-        # Update message met 2 regels
-        message = [
-            f"Place {current_step['name']}",
-            "White on white LEDs, black on orange LEDs"
-        ]
-        self.show_temp_message(message, duration=99999)
+        print(f"\nSetup step {step_num}/{total_steps}")
         
-        # Light up LEDs voor pieces die nog niet geplaatst zijn
         self.leds.clear()
         
-        # White pieces
-        for square in current_step.get('squares', []):
-            if square not in self.assisted_setup_placed_squares:
-                sensor_num = ChessMapper.chess_to_sensor(square)
-                if sensor_num is not None:
-                    r, g, b, w = current_step['color']
-                    self.leds.set_led(sensor_num, r, g, b, w)
-        
-        # Black pieces (als aanwezig)
-        if 'squares_black' in current_step:
-            for square in current_step['squares_black']:
-                if square not in self.assisted_setup_placed_squares:
-                    sensor_num = ChessMapper.chess_to_sensor(square)
-                    if sensor_num is not None:
-                        r, g, b, w = current_step['color_black']
-                        self.leds.set_led(sensor_num, r, g, b, w)
-        
-        self.leds.show()
-        
-        # Update GUI to highlight squares (alleen niet-geplaatste) - combineer wit en zwart
-        all_squares = current_step.get('squares', []) + current_step.get('squares_black', [])
-        remaining_squares = [sq for sq in all_squares if sq not in self.assisted_setup_placed_squares]
-        self.gui.highlighted_squares = remaining_squares
-        self.gui.capture_squares = []  # No captures during setup
-        
-        # Force screen update
-        self.screen_dirty = True
-    
-    def _update_assisted_setup_sensors(self):
-        """Check sensors during assisted setup and update LEDs"""
-        if not self.gui.assisted_setup_mode:
-            return
-        
-        steps = self._get_setup_steps()
-        if self.gui.assisted_setup_step >= len(steps):
-            return
-        
-        current_step = steps[self.gui.assisted_setup_step]
-        current_sensors = self.read_sensors()
-        
-        # Combineer witte en zwarte squares
-        all_squares_with_colors = []
-        for square in current_step.get('squares', []):
-            all_squares_with_colors.append((square, current_step['color']))
-        for square in current_step.get('squares_black', []):
-            all_squares_with_colors.append((square, current_step['color_black']))
-        
-        # Check welke pieces zijn toegevoegd of verwijderd
-        pieces_added = False
-        pieces_removed = False
-        
-        for square, color in all_squares_with_colors:
-            is_detected = current_sensors.get(square, False)
-            was_placed = square in self.assisted_setup_placed_squares
+        if current_step['type'] == 'remove':
+            # Show squares to remove pieces from (RED LEDs)
+            squares = current_step['squares']
+            print(f"REMOVE pieces from: {', '.join(squares)}")
             
-            if is_detected and not was_placed:
-                # Nieuw stuk geplaatst
-                self.assisted_setup_placed_squares.add(square)
-                print(f"  Piece placed on {square}")
-                
-                # Turn off LED voor dit square
-                sensor_num = ChessMapper.chess_to_sensor(square)
-                if sensor_num is not None:
-                    self.leds.set_led(sensor_num, 0, 0, 0, 0)
-                pieces_added = True
-                
-            elif not is_detected and was_placed:
-                # Stuk weggehaald
-                self.assisted_setup_placed_squares.remove(square)
-                print(f"  Piece removed from {square}")
-                
-                # Turn LED terug AAN voor dit square (met juiste kleur)
-                sensor_num = ChessMapper.chess_to_sensor(square)
-                if sensor_num is not None:
-                    r, g, b, w = color
-                    self.leds.set_led(sensor_num, r, g, b, w)
-                pieces_removed = True
-        
-        # Update LEDs en GUI als er iets veranderd is
-        if pieces_added or pieces_removed:
-            self.leds.show()
-            
-            # Update highlighted squares (combineer witte en zwarte squares)
-            all_step_squares = current_step.get('squares', []) + current_step.get('squares_black', [])
-            remaining_squares = [sq for sq in all_step_squares if sq not in self.assisted_setup_placed_squares]
-            self.gui.highlighted_squares = remaining_squares
-            
-            # Update message met 2 regels
             message = [
-                f"Place {current_step['name']}",
+                f"Step {step_num}/{total_steps}: Remove {len(squares)} extra piece(s)",
+                f"From: {', '.join(squares)}"
+            ]
+            self.show_temp_message(message, duration=99999)
+            
+            # Red LEDs for pieces to remove
+            for square in squares:
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    self.leds.set_led(sensor_num, 255, 0, 0, 0)  # RED
+            
+            self.gui.highlighted_squares = squares
+            
+        elif current_step['type'] == 'place':
+            # Show squares to place pieces on (color-coded by piece color)
+            piece_type = current_step['piece_type']
+            pieces = current_step['pieces']
+            squares = [p['pos'] for p in pieces]
+            
+            # Count white and black pieces
+            white_pieces = [p for p in pieces if self._is_white_piece(p['piece'])]
+            black_pieces = [p for p in pieces if not self._is_white_piece(p['piece'])]
+            
+            # Build descriptive message
+            pieces_desc = []
+            if white_pieces:
+                pieces_desc.append(f"{len(white_pieces)} White")
+            if black_pieces:
+                pieces_desc.append(f"{len(black_pieces)} Black")
+            desc_text = " + ".join(pieces_desc)
+            
+            print(f"PLACE {desc_text} {piece_type} on: {', '.join(squares)}")
+            
+            message = [
+                f"Step {step_num}/{total_steps}: Place {desc_text} {piece_type}",
                 "White on white LEDs, black on orange LEDs"
             ]
             self.show_temp_message(message, duration=99999)
             
-            # Force screen update
-            self.screen_dirty = True
+            # Color-coded LEDs based on piece color (white or black)
+            for piece_info in pieces:
+                square = piece_info['pos']
+                piece = piece_info['piece']
+                sensor_num = ChessMapper.chess_to_sensor(square)
+                if sensor_num is not None:
+                    # White pieces: white LED, Black pieces: orange LED
+                    if self._is_white_piece(piece):
+                        self.leds.set_led(sensor_num, 255, 255, 255, 0)  # WHITE
+                    else:
+                        self.leds.set_led(sensor_num, 200, 100, 0, 0)     # ORANGE
+            
+            self.gui.highlighted_squares = squares
         
-        # Check of ALLE pieces van deze stap geplaatst zijn - alleen bij toevoegingen checken
+        self.leds.show()
+        self.gui.capture_squares = []  # No captures during setup
+        self.screen_dirty = True
+    
+    def _update_assisted_setup_sensors(self):
+        """Check sensors during assisted setup and advance when step is complete"""
+        if not self.gui.assisted_setup_mode:
+            return
+        
+        if self.gui.assisted_setup_step >= len(self.assisted_setup_steps):
+            return
+        
+        current_step = self.assisted_setup_steps[self.gui.assisted_setup_step]
+        current_sensors = self.read_sensors()
+        
+        # Check if current step is complete
+        step_complete = False
+        
+        if current_step['type'] == 'remove':
+            # Check if all pieces are removed (sensors should be False)
+            squares = current_step['squares']
+            all_removed = all(not current_sensors.get(sq, False) for sq in squares)
+            
+            if all_removed:
+                print(f"  Step {self.gui.assisted_setup_step + 1} complete: All pieces removed")
+                step_complete = True
+        
+        elif current_step['type'] == 'place':
+            # Check if all pieces are placed (sensors should be True)
+            squares = [p['pos'] for p in current_step['pieces']]
+            all_placed = all(current_sensors.get(sq, False) for sq in squares)
+            
+            if all_placed:
+                print(f"  Step {self.gui.assisted_setup_step + 1} complete: All pieces placed")
+                step_complete = True
+        
+        # Advance to next step if complete
+        if step_complete:
+            self.sound_manager.play_select()  # Feedback sound
+            self.gui.assisted_setup_step += 1
+            self._show_current_setup_step()
     
     def _update_tutorial(self, dt):
         """Update tutorial mode - cycle through rows, columns, and all diagonals"""
@@ -2434,9 +2538,52 @@ class BaseGame(ABC):
         self.gui.assisted_setup_step += 1
         self._show_current_setup_step()
     
+    def _cancel_assisted_setup(self):
+        """Cancel assisted setup without finishing"""
+        print("Assisted setup cancelled by user")
+        self.gui.assisted_setup_mode = False
+        self.gui.assisted_setup_step = 0
+        self.gui.assisted_setup_waiting = False
+        self.gui.show_skip_setup_step_confirm = False
+        
+        # Clear LEDs
+        self.leds.clear()
+        self.leds.show()
+        
+        # Clear highlights
+        self.gui.highlighted_squares = []
+        self.gui.capture_squares = []
+        
+        # Clear message
+        self.temp_message = None
+        
+        # Show cancelled message
+        self.show_temp_message("Setup cancelled", duration=2)
+        
+        # Force screen update
+        self.screen_dirty = True
+    
     def _finish_assisted_setup(self):
-        """Finish assisted setup and start game"""
-        print("Assisted setup complete! Starting game...")
+        """Finish assisted setup and validate final board state"""
+        print("Assisted setup steps complete! Validating final board state...")
+        
+        # Final validation
+        current_sensors = self.read_sensors()
+        mismatches = self.validate_board_state(current_sensors)
+        
+        if mismatches:
+            # Still have issues - restart assisted setup
+            print(f"Board validation failed: {len(mismatches)} mismatches remaining")
+            print(f"Mismatches at: {', '.join(mismatches)}")
+            self.show_temp_message(["Validation failed!", f"{len(mismatches)} mismatches remaining", "Restarting setup..."], duration=3)
+            
+            # Wait a moment then restart
+            pygame.time.wait(3000)
+            self._start_assisted_setup()
+            return
+        
+        # Board is correct!
+        print("Board validation successful! Starting game...")
         self.gui.assisted_setup_mode = False
         self.gui.assisted_setup_step = 0
         self.gui.assisted_setup_waiting = False
@@ -2454,6 +2601,9 @@ class BaseGame(ABC):
         # Clear highlights
         self.gui.highlighted_squares = []
         self.gui.capture_squares = []
+        
+        # Success message
+        self.show_temp_message("Setup complete! Game started.", duration=2)
         
         # Force screen update
         self.screen_dirty = True
