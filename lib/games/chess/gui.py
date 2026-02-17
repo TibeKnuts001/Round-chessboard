@@ -145,6 +145,7 @@ class ChessGUI:
         self.assisted_setup_waiting = False  # Wacht op gebruiker om door te gaan
         self.highlighted_squares = []  # Normale moves (groen)
         self.capture_squares = []  # Capture moves (rood)
+        self.tutorial_squares = {}  # Tutorial mode squares {square: (r, g, b)}
         self.last_move_from = None  # Voor highlighting van laatste zet
         self.last_move_to = None
         self.last_move_intermediate = []  # Voor rook positions bij castling
@@ -225,10 +226,10 @@ class ChessGUI:
         self.board_surface.blit(self.cached_board, (0, 0))
         
         # Teken highlights bovenop board_surface (alleen als nodig)
-        if self.highlighted_squares or self.selected_piece_from or self.capture_squares:
+        if self.highlighted_squares or self.selected_piece_from or self.capture_squares or self.tutorial_squares:
             temp_screen = self.board_renderer.screen
             self.board_renderer.screen = self.board_surface
-            self.board_renderer.draw_highlights(self.highlighted_squares, self.selected_piece_from, self.capture_squares)
+            self.board_renderer.draw_highlights(self.highlighted_squares, self.selected_piece_from, self.capture_squares, self.tutorial_squares)
             self.board_renderer.screen = temp_screen
     
     def draw_coordinates(self):
@@ -516,6 +517,7 @@ class ChessGUI:
         power_profiles = []
         screensaver_button = None
         test_position_button = None
+        tutorial_button = None
         if self.show_settings:
             settings_result = self.draw_settings_dialog()
             ok_button = settings_result['ok_button']
@@ -527,6 +529,7 @@ class ChessGUI:
             power_profiles = settings_result.get('power_profiles', [])
             screensaver_button = settings_result.get('screensaver_button')
             test_position_button = settings_result.get('test_position_button')
+            tutorial_button = settings_result.get('tutorial_button')
             # Extract individual values for backwards compatibility
             toggle_rect = toggles.get('coordinates')
             debug_toggle_rect = toggles.get('debug_sensors')
@@ -591,9 +594,6 @@ class ChessGUI:
                 
                 UIWidgets.draw_notification(self.screen, message_text, board_width=self.board_size, board_height=self.board_size, notification_type=notification_type)
         
-        # Update display
-        pygame.display.flip()
-        
         return {
             'ok_button': ok_button,
             'tabs': tabs if self.show_settings else None,
@@ -604,6 +604,7 @@ class ChessGUI:
             'power_profiles': power_profiles if self.show_settings else [],
             'screensaver_button': screensaver_button,
             'test_position_button': test_position_button,
+            'tutorial_button': tutorial_button,
             'undo_button': self.undo_button,
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,

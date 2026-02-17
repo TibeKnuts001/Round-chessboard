@@ -85,6 +85,12 @@ class BaseGame(ABC):
         self.ai_move_pending = None  # Track AI move execution: {'from': pos, 'to': pos, 'intermediate': [], 'piece_removed': False}
         self.castling_pending = None  # Track castling rook movement: {'rook_from': pos, 'rook_to': pos, 'rook_removed': False}
         
+        # Tutorial mode variables
+        self.tutorial_active = False
+        self.tutorial_time = 0
+        self.tutorial_step = 0
+        self.tutorial_step_duration = 1.5  # seconds per step
+        
         # LED Animator voor idle effects
         self.led_animator = LEDAnimator(self.leds)
         self.led_animator.start_random_animation()  # Start animatie bij startup
@@ -697,8 +703,8 @@ class BaseGame(ABC):
                         if int(elapsed * 10) % 2 == 0:  # Print elke 0.2s
                             print(f"Waiting for screensaver... {elapsed:.2f}s / 0.5s")
                 
-                # Check screensaver status (ALLEEN als game NIET gestart EN NIET in assisted setup)
-                if not self.game_started and not self.gui.assisted_setup_mode:
+                # Check screensaver status (ALLEEN als game NIET gestart EN NIET in assisted setup EN NIET in tutorial)
+                if not self.game_started and not self.gui.assisted_setup_mode and not self.tutorial_active:
                     if not self.screensaver_active and not self.screensaver_starting and (current_time - self.last_activity_time) > self.screensaver_timeout:
                         # Start screensaver
                         self.screensaver_active = True
@@ -707,8 +713,8 @@ class BaseGame(ABC):
                         self.leds.show()
                         print("Screensaver gestart (timeout)")
                 
-                # Als game gestart is of assisted setup actief: zorg dat screensaver UIT is
-                if self.game_started or self.gui.assisted_setup_mode:
+                # Als game gestart is of assisted setup actief of tutorial actief: zorg dat screensaver UIT is
+                if self.game_started or self.gui.assisted_setup_mode or self.tutorial_active:
                     if self.screensaver_active or self.screensaver_starting:
                         self.screensaver.stop_audio()
                         self.screensaver_active = False
@@ -772,8 +778,14 @@ class BaseGame(ABC):
                 # Update AI status indien gewijzigd (game-specifiek)
                 self._update_ai_status()
                 
-                # Update LED blink animatie
-                self._update_led_animations()
+                # Update tutorial mode if active
+                if self.tutorial_active:
+                    dt = clock.get_time() / 1000.0  # Convert ms to seconds
+                    self._update_tutorial(dt)
+                
+                # Update LED blink animatie (skip if tutorial active)
+                if not self.tutorial_active:
+                    self._update_led_animations()
                 
                 # Lees sensors
                 current_sensors = self.read_sensors()
@@ -795,9 +807,14 @@ class BaseGame(ABC):
                     self.temp_message = None
                     self.screen_dirty = True
                 
-                # Draw GUI alleen als screen dirty
+                # Draw screen (only when dirty)
                 if self.screen_dirty:
                     gui_result = self.gui.draw(self.temp_message, self.temp_message_timer, game_started=self.game_started)
+                    
+                    # Draw tutorial overlay if active
+                    if self.tutorial_active:
+                        self._draw_tutorial_overlay()
+                    
                     pygame.display.flip()
                     self.screen_dirty = False
                     self.last_gui_result = gui_result  # Cache voor volgende frame
@@ -1274,6 +1291,25 @@ class BaseGame(ABC):
         undo_yes_button = gui_result.get('undo_yes')
         undo_no_button = gui_result.get('undo_no')
         
+        # Check if tutorial is active and click is on board
+        if self.tutorial_active:
+            # Check if click is within board area (not on sidebar)
+            # Board is on left side, sidebar on right
+            board_width = self.screen.get_height()  # Board is square, height = width
+            if pos[0] < board_width:
+                print("Tutorial exit - board clicked")
+                self.tutorial_active = False
+                self.leds.clear()
+                self.leds.show()
+                # Clear tutorial squares from board
+                self.gui.tutorial_squares = {}
+                # Restart LED animator
+                self.led_animator.start_random_animation()
+                # Reset activity timer to prevent immediate screensaver
+                self.last_activity_time = time.time()
+                self.screen_dirty = True
+                return True
+        
         # Undo confirmation dialog
         if self.gui.show_undo_confirm:
             if undo_yes_button and undo_yes_button.collidepoint(pos):
@@ -1446,12 +1482,36 @@ class BaseGame(ABC):
         ok_button = gui_result.get('ok_button')
         screensaver_button = gui_result.get('screensaver_button')
         test_position_button = gui_result.get('test_position_button')
+        tutorial_button = gui_result.get('tutorial_button')
         
         # Check test position button (chess only)
         if test_position_button and test_position_button.collidepoint(pos):
             self._load_test_position()
             self.gui.show_settings = False
             self.gui.temp_settings = {}
+            return
+        
+        # Check tutorial button
+        if tutorial_button and tutorial_button.collidepoint(pos):
+            print("Starting tutorial mode...")
+            self.tutorial_active = True
+            self.tutorial_time = 0
+            self.tutorial_step = 0
+            # Stop LED animator
+            self.led_animator.stop()
+            # Clear any existing LED effects
+            self.leds.clear()
+            self.leds.show()
+            # Show first tutorial step (row 1)
+            self._show_tutorial_row(1)
+            # Reset LED animation state
+            if hasattr(self, '_ai_move_leds_set'):
+                self._ai_move_leds_set = False
+            if hasattr(self, '_castling_leds_set'):
+                self._castling_leds_set = False
+            self.gui.show_settings = False
+            self.gui.temp_settings = {}
+            self.screen_dirty = True
             return
         
         # Check screensaver button
@@ -1865,12 +1925,219 @@ class BaseGame(ABC):
             self.screen_dirty = True
         
         # Check of ALLE pieces van deze stap geplaatst zijn - alleen bij toevoegingen checken
-        if pieces_added:
-            all_step_squares = current_step.get('squares', []) + current_step.get('squares_black', [])
-            all_placed = all(sq in self.assisted_setup_placed_squares for sq in all_step_squares)
-            if all_placed:
-                print(f"  All pieces for step {self.gui.assisted_setup_step + 1} detected!")
-                self._advance_setup_step()
+    
+    def _update_tutorial(self, dt):
+        """Update tutorial mode - cycle through rows, columns, and all diagonals"""
+        self.tutorial_time += dt
+        
+        if self.tutorial_time >= self.tutorial_step_duration:
+            self.tutorial_time = 0
+            self.tutorial_step = (self.tutorial_step + 1) % 42  # 8 rows + 8 columns + 13 + 13 diagonals
+            self.screen_dirty = True
+            
+            # Update LEDs only when step changes
+            if self.tutorial_step < 8:
+                # Show rows 1-8
+                self._show_tutorial_row(self.tutorial_step + 1)
+            elif self.tutorial_step < 16:
+                # Show columns A-H
+                col_idx = self.tutorial_step - 8
+                self._show_tutorial_column(chr(ord('A') + col_idx))
+            elif self.tutorial_step < 29:
+                # Show diagonals going up-right (A1-H8 direction) - 13 diagonals (min length 2)
+                diagonal_idx = self.tutorial_step - 16
+                self._show_tutorial_diagonal_upright(diagonal_idx)
+            else:
+                # Show diagonals going down-right (A8-H1 direction) - 13 diagonals (min length 2)
+                diagonal_idx = self.tutorial_step - 29
+                self._show_tutorial_diagonal_downright(diagonal_idx)
+    
+    def _show_tutorial_row(self, row_num):
+        """Show LEDs and board squares for a specific row (1-8)"""
+        from lib.hardware.mapping import ChessMapper
+        
+        self.leds.clear()
+        self.gui.tutorial_squares = {}
+        
+        # Light up all squares in this row
+        for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+            pos = f"{col}{row_num}"
+            sensor = ChessMapper.chess_to_sensor(pos)
+            if sensor is not None:
+                # Cyan color for rows
+                self.leds.set_led(sensor, 0, 255, 255, 0)
+            # Add to board highlighting
+            self.gui.tutorial_squares[pos] = (0, 255, 255)  # Cyan
+        
+        self.leds.show()
+        self.screen_dirty = True
+    
+    def _show_tutorial_column(self, col):
+        """Show LEDs and board squares for a specific column (A-H)"""
+        from lib.hardware.mapping import ChessMapper
+        
+        self.leds.clear()
+        self.gui.tutorial_squares = {}
+        
+        # Light up all squares in this column
+        for row in range(1, 9):
+            pos = f"{col}{row}"
+            sensor = ChessMapper.chess_to_sensor(pos)
+            if sensor is not None:
+                # Cyan color for columns (same as rows)
+                self.leds.set_led(sensor, 0, 255, 255, 0)
+            # Add to board highlighting
+            self.gui.tutorial_squares[pos] = (0, 255, 255)  # Cyan
+        
+        self.leds.show()
+        self.screen_dirty = True
+    
+    def _show_tutorial_diagonal_upright(self, diagonal_idx):
+        """Show LEDs and board squares for diagonals going up-right (/ direction) - starting from corners"""
+        from lib.hardware.mapping import ChessMapper
+        
+        self.leds.clear()
+        self.gui.tutorial_squares = {}
+        
+        # Generate diagonal squares starting from corners
+        # First 7 diagonals: from left edge (column A), going from row 7 down to row 1
+        # Next 6 diagonals: from bottom edge (row 1), going from column B to column G
+        squares = []
+        
+        if diagonal_idx < 7:
+            # Start from left column (A), rows 7,6,5,4,3,2,1
+            start_row = 7 - diagonal_idx  # 7, 6, 5, 4, 3, 2, 1
+            start_col = 0  # A
+            for i in range(9 - start_row):  # length increases as we go down
+                col = chr(ord('A') + start_col + i)
+                row = start_row + i
+                if col <= 'H' and row <= 8:
+                    squares.append(f"{col}{row}")
+        else:
+            # Start from bottom row (row 1), columns B,C,D,E,F,G
+            start_col = diagonal_idx - 7 + 1  # 1,2,3,4,5,6 -> B,C,D,E,F,G
+            start_row = 1
+            for i in range(8 - start_col):  # length decreases as we go right
+                col = chr(ord('A') + start_col + i)
+                row = start_row + i
+                if col <= 'H' and row <= 8:
+                    squares.append(f"{col}{row}")
+        
+        # Light up the diagonal
+        for pos in squares:
+            sensor = ChessMapper.chess_to_sensor(pos)
+            if sensor is not None:
+                # Cyan color for diagonals (same as rows)
+                self.leds.set_led(sensor, 0, 255, 255, 0)
+            # Add to board highlighting
+            self.gui.tutorial_squares[pos] = (0, 255, 255)  # Cyan
+        
+        self.leds.show()
+        self.screen_dirty = True
+    
+    def _show_tutorial_diagonal_downright(self, diagonal_idx):
+        """Show LEDs and board squares for diagonals going down-right (\\ direction) - starting from corners"""
+        from lib.hardware.mapping import ChessMapper
+        
+        self.leds.clear()
+        self.gui.tutorial_squares = {}
+        
+        # Generate diagonal squares starting from corners
+        # First 7 diagonals: from left edge (column A), going from row 2 up to row 8
+        # Next 6 diagonals: from top edge (row 8), going from column B to column G
+        squares = []
+        
+        if diagonal_idx < 7:
+            # Start from left column (A), rows 2,3,4,5,6,7,8
+            start_row = diagonal_idx + 2  # 2, 3, 4, 5, 6, 7, 8
+            start_col = 0  # A
+            for i in range(start_row):  # length increases as we go up
+                col = chr(ord('A') + start_col + i)
+                row = start_row - i
+                if col <= 'H' and row >= 1:
+                    squares.append(f"{col}{row}")
+        else:
+            # Start from top row (row 8), columns B,C,D,E,F,G
+            start_col = diagonal_idx - 7 + 1  # 1,2,3,4,5,6 -> B,C,D,E,F,G
+            start_row = 8
+            for i in range(8 - start_col):  # length decreases as we go right
+                col = chr(ord('A') + start_col + i)
+                row = start_row - i
+                if col <= 'H' and row >= 1:
+                    squares.append(f"{col}{row}")
+        
+        # Light up the diagonal
+        for pos in squares:
+            sensor = ChessMapper.chess_to_sensor(pos)
+            if sensor is not None:
+                # Cyan color for diagonals (same as rows)
+                self.leds.set_led(sensor, 0, 255, 255, 0)
+            # Add to board highlighting
+            self.gui.tutorial_squares[pos] = (0, 255, 255)  # Cyan
+        
+        self.leds.show()
+        self.screen_dirty = True
+    
+    def _show_tutorial_diagonal(self, diagonal_type):
+        """Show LEDs for diagonals (deprecated - kept for compatibility)"""
+        from lib.hardware.mapping import ChessMapper
+        
+        self.leds.clear()
+        
+        if diagonal_type == 'main':
+            # Main diagonal A1-H8
+            for i in range(8):
+                col = chr(ord('A') + i)
+                row = i + 1
+                pos = f"{col}{row}"
+                sensor = ChessMapper.chess_to_sensor(pos)
+                if sensor is not None:
+                    # Yellow color for diagonals
+                    self.leds.set_led(sensor, 0, 255, 255, 255)
+        else:
+            # Anti-diagonal A8-H1
+            for i in range(8):
+                col = chr(ord('A') + i)
+                row = 8 - i
+                pos = f"{col}{row}"
+                sensor = ChessMapper.chess_to_sensor(pos)
+                if sensor is not None:
+                    # Yellow color for diagonals
+                    self.leds.set_led(sensor, 0, 255, 255, 255)
+        
+        self.leds.show()
+    
+    def _draw_tutorial_overlay(self):
+        """Draw simple tutorial instruction in sidebar"""
+        if not self.tutorial_active:
+            return
+        
+        # Get screen dimensions
+        screen_width = self.screen.get_width()
+        screen_height = self.screen.get_height()
+        board_size = screen_height  # Board is square
+        sidebar_width = screen_width - board_size
+        
+        # Show exit instruction in sidebar center
+        font = pygame.font.Font(None, 48)
+        instruction = font.render("Click the board", True, (255, 255, 255))
+        instruction2 = font.render("to exit tutorial", True, (255, 255, 255))
+        
+        # Center in sidebar
+        sidebar_center_x = board_size + sidebar_width // 2
+        sidebar_center_y = screen_height // 2
+        
+        instruction_rect = instruction.get_rect(center=(sidebar_center_x, sidebar_center_y - 30))
+        instruction2_rect = instruction2.get_rect(center=(sidebar_center_x, sidebar_center_y + 30))
+        
+        # Dark background for text readability
+        bg_rect = instruction_rect.union(instruction2_rect).inflate(40, 40)
+        bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+        bg_surface.fill((0, 0, 0, 180))
+        self.screen.blit(bg_surface, bg_rect.topleft)
+        
+        self.screen.blit(instruction, instruction_rect)
+        self.screen.blit(instruction2, instruction2_rect)
     
     def _advance_setup_step(self):
         """Advance to next setup step"""

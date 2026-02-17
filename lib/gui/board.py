@@ -84,7 +84,7 @@ class BaseBoardRenderer:
                 if selected_square and square_notation == selected_square:
                     self._draw_selection_indicator(col, row)
     
-    def draw_highlights(self, highlighted_squares, selected_square, capture_squares=None):
+    def draw_highlights(self, highlighted_squares, selected_square, capture_squares=None, tutorial_squares=None):
         """
         Teken alleen de highlights/selections bovenop bestaand board
         Gebruikt voor efficient caching: board grid cached, alleen highlights hertekenen
@@ -93,16 +93,25 @@ class BaseBoardRenderer:
             highlighted_squares: List van square notaties voor normale moves
             selected_square: Notatie van geselecteerd veld of None
             capture_squares: List van square notaties voor captures (rood)
+            tutorial_squares: Dict van {square: (r, g, b)} voor tutorial mode
         """
         if capture_squares is None:
             capture_squares = []
+        if tutorial_squares is None:
+            tutorial_squares = {}
         
         for row in range(8):
             for col in range(8):
                 square_notation = self._get_square_notation(row, col)
                 
                 # Teken overlay alleen als er een highlight is
-                if square_notation in capture_squares or square_notation in highlighted_squares:
+                if square_notation in tutorial_squares:
+                    # Tutorial squares have custom colors
+                    overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+                    color = tutorial_squares[square_notation]
+                    overlay.fill((*color, 180))  # 70% transparency for tutorial
+                    self.screen.blit(overlay, (col * self.square_size, row * self.square_size))
+                elif square_notation in capture_squares or square_notation in highlighted_squares:
                     # Semi-transparent overlay
                     overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
                     

@@ -89,7 +89,8 @@ class SettingsDialog:
             'sliders': {},
             'toggles': {},
             'dropdowns': {},
-            'screensaver_button': None  # Default None, wordt gezet in debug tab
+            'screensaver_button': None,  # Default None, wordt gezet in debug tab
+            'tutorial_button': None  # Default None, wordt gezet in general tab
         }
         
         start_x = dialog_x + (dialog_width - (len(tab_list) * (tab_width + tab_spacing) - tab_spacing)) // 2
@@ -244,6 +245,18 @@ class SettingsDialog:
         self.screen.blit(audio_label, (audio_toggle_rect.right + 15, y_pos + 8))
         
         result['toggles']['screensaver_audio'] = audio_toggle_rect
+        
+        y_pos += 70
+        
+        # Tutorial button
+        tutorial_button_rect = pygame.Rect(label_x, y_pos, 250, 45)
+        tutorial_button = UIWidgets.draw_button(
+            self.screen,
+            tutorial_button_rect,
+            "Show Board Tutorial",
+            self.font_small
+        )
+        result['tutorial_button'] = tutorial_button
     
     def _draw_debug_tab(self, dialog_x, content_y, settings, result):
         """Teken debug tab (debug settings - shared)"""
