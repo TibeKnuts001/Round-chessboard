@@ -2327,8 +2327,8 @@ class BaseGame(ABC):
                         'New version installed',
                         '',
                         'Please restart the application:',
-                        '1. Exit the game',
-                        '2. Run ./run.sh to start with new version'
+                        'Exit the game',
+                        'Run ./run.sh to start with new version'
                     ]
                 }
             else:

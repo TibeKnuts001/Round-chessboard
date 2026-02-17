@@ -249,7 +249,7 @@ class SettingsDialog:
         
         y_pos += 70
         
-        # Tutorial button
+        # Tutorial button (left)
         tutorial_button_rect = pygame.Rect(label_x, y_pos, 250, 45)
         tutorial_button = UIWidgets.draw_button(
             self.screen,
@@ -259,10 +259,8 @@ class SettingsDialog:
         )
         result['tutorial_button'] = tutorial_button
         
-        y_pos += 60
-        
-        # Check for Updates button
-        check_updates_button_rect = pygame.Rect(label_x, y_pos, 250, 45)
+        # Check for Updates button (right, next to tutorial)
+        check_updates_button_rect = pygame.Rect(label_x + 270, y_pos, 250, 45)
         check_updates_button = UIWidgets.draw_button(
             self.screen,
             check_updates_button_rect,
