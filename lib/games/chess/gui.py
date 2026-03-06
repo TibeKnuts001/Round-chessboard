@@ -145,6 +145,7 @@ class ChessGUI:
         self.assisted_setup_mode = False  # Assisted setup actief
         self.assisted_setup_step = 0  # Huidige stap in assisted setup
         self.assisted_setup_waiting = False  # Wacht op gebruiker om door te gaan
+        self.current_setup_piece_display_images = []  # Piece icoontjes voor assisted setup notification
         self.highlighted_squares = []  # Normale moves (groen)
         self.capture_squares = []  # Capture moves (rood)
         self.tutorial_squares = {}  # Tutorial mode squares {square: (r, g, b)}
@@ -610,7 +611,8 @@ class ChessGUI:
                     else:
                         notification_type = 'warning'
                 
-                UIWidgets.draw_notification(self.screen, message_text, board_width=self.board_size, board_height=self.board_size, notification_type=notification_type)
+                UIWidgets.draw_notification(self.screen, message_text, board_width=self.board_size, board_height=self.board_size, notification_type=notification_type,
+                                            piece_images=self.current_setup_piece_display_images if self.assisted_setup_mode else None)
         
         return {
             'ok_button': ok_button,

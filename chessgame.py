@@ -87,6 +87,12 @@ class ChessGame(BaseGame):
             return True
         return piece.color  # True for white, False for black
     
+    def _get_piece_image_key(self, piece):
+        """Get image key for chess piece (uppercase = white, lowercase = black)"""
+        if piece is None:
+            return None
+        return piece.symbol()  # e.g. 'P', 'p', 'Q', 'q', 'K', 'k', etc.
+    
     def _create_ai(self):
         """Maak Stockfish AI als VS Computer enabled is"""
         # Check of worstfish mode aan staat

@@ -75,6 +75,14 @@ class CheckersGame(BaseGame):
             return True
         return piece.color == "white"
     
+    def _get_piece_image_key(self, piece):
+        """Get image key for checkers piece (e.g. 'white_man', 'black_king')"""
+        if piece is None:
+            return None
+        color = 'white' if piece.color == 'white' else 'black'
+        kind = 'king' if piece.is_king else 'man'
+        return f"{color}_{kind}"
+    
     def _create_ai(self):
         """Maak AI als VS Computer enabled is"""
         # Check of we in checkers sectie zitten (niet chess)

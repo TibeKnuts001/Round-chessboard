@@ -288,7 +288,7 @@ class UIWidgets:
         return rect
 
     @staticmethod
-    def draw_notification(screen, message, board_width=800, board_height=800, notification_type='warning'):
+    def draw_notification(screen, message, board_width=800, board_height=800, notification_type='warning', piece_images=None):
         """
         Teken een notification overlay (gecentreerd op bord)
         
@@ -298,6 +298,7 @@ class UIWidgets:
             board_width: Breedte van het bord (voor centreren)
             board_height: Hoogte van het bord (voor centreren)
             notification_type: 'warning', 'error', 'info', 'success'
+            piece_images: Optionele lijst van pygame.Surface piece icoontjes om links te tonen
         """
         # Support multi-line messages
         if isinstance(message, str):
@@ -305,8 +306,11 @@ class UIWidgets:
         else:
             lines = message
         
-        overlay_width = 400
-        overlay_height = 100 + (len(lines) - 1) * 30  # Extra hoogte voor extra regels
+        overlay_width = 420
+        overlay_height = 110 + (len(lines) - 1) * 30  # Extra hoogte voor extra regels
+        # Als er piece images zijn en er meerdere zijn, maak de box hoger
+        if piece_images and len(piece_images) > 1:
+            overlay_height = max(overlay_height, 60 + len(piece_images) * 60)
         # Centreer in het midden van het 800x800 speelveld (links op scherm)
         overlay_x = (board_width - overlay_width) // 2  # Horizontaal gecentreerd in bord
         overlay_y = (board_height - overlay_height) // 2  # Verticaal gecentreerd in bord
@@ -348,17 +352,36 @@ class UIWidgets:
         pygame.draw.rect(screen, border_color, 
                         (overlay_x, overlay_y, overlay_width, overlay_height), 4, border_radius=12)
         
-        # Icon (simpele text, geen unicode)
-        font_large = pygame.font.Font(None, 72)
-        icon = font_large.render(icon_text, True, icon_color)
-        icon_rect = icon.get_rect(center=(overlay_x + 40, overlay_y + overlay_height // 2))
-        screen.blit(icon, icon_rect)
+        # Piece images of tekst icon links in de box
+        icon_area_width = 80  # Breedte van het linker icon gebied
+        if piece_images:
+            # Toon piece icoontjes (max 2 stacked vertically, elk 52x52)
+            img_size = 52
+            imgs_to_show = piece_images[:2]
+            total_imgs_height = len(imgs_to_show) * img_size + (len(imgs_to_show) - 1) * 6
+            img_start_y = overlay_y + (overlay_height - total_imgs_height) // 2
+            img_x = overlay_x + (icon_area_width - img_size) // 2
+            for idx, img in enumerate(imgs_to_show):
+                scaled = pygame.transform.smoothscale(img, (img_size, img_size))
+                screen.blit(scaled, (img_x, img_start_y + idx * (img_size + 6)))
+        else:
+            # Tekst icon (!, i, X, OK)
+            font_large = pygame.font.Font(None, 72)
+            icon = font_large.render(icon_text, True, icon_color)
+            icon_rect = icon.get_rect(center=(overlay_x + icon_area_width // 2, overlay_y + overlay_height // 2))
+            screen.blit(icon, icon_rect)
+        
+        # Scheidingslijn tussen icon en tekst
+        pygame.draw.line(screen, border_color,
+                         (overlay_x + icon_area_width, overlay_y + 10),
+                         (overlay_x + icon_area_width, overlay_y + overlay_height - 10), 1)
         
         # Message tekst (multi-line support)
         font = pygame.font.Font(None, 28)
         font_small = pygame.font.Font(None, 22)
         
-        # Teken elke regel
+        # Tekst rechts van het icon gebied
+        text_area_x = overlay_x + icon_area_width + (overlay_width - icon_area_width) // 2
         total_text_height = len(lines) * 30
         start_y = overlay_y + (overlay_height - total_text_height) // 2
         
@@ -366,5 +389,5 @@ class UIWidgets:
             # Eerste regel iets groter, rest kleiner
             current_font = font if i == 0 else font_small
             text = current_font.render(line, True, UIWidgets.COLOR_WHITE)
-            text_rect = text.get_rect(center=(overlay_x + overlay_width // 2 + 20, start_y + i * 30 + 15))
+            text_rect = text.get_rect(center=(text_area_x, start_y + i * 30 + 15))
             screen.blit(text, text_rect)

@@ -1962,6 +1962,18 @@ class BaseGame(ABC):
         """
         return True
     
+    def _get_piece_image_key(self, piece):
+        """Get image key for a piece to show in assisted setup notification.
+        Must be overridden by subclass.
+        
+        Args:
+            piece: Piece object from engine
+            
+        Returns:
+            str: Image key for self.gui.board_renderer.piece_images, or None
+        """
+        return None
+    
     def _show_current_setup_step(self):
         """Show current step in assisted setup"""
         if self.gui.assisted_setup_step >= len(self.assisted_setup_steps):
@@ -1987,6 +1999,7 @@ class BaseGame(ABC):
                 f"From: {', '.join(squares)}"
             ]
             self.show_temp_message(message, duration=99999)
+            self.gui.current_setup_piece_display_images = []
             
             # Red LEDs for pieces to remove
             for square in squares:
@@ -2021,6 +2034,19 @@ class BaseGame(ABC):
                 "White on white LEDs, black on orange LEDs"
             ]
             self.show_temp_message(message, duration=99999)
+            
+            # Verzamel piece images om in de notification te tonen
+            display_images = []
+            seen_keys = set()
+            # Wit eerst, dan zwart
+            for p in (white_pieces + black_pieces):
+                key = self._get_piece_image_key(p['piece'])
+                if key and key not in seen_keys:
+                    seen_keys.add(key)
+                    img = getattr(getattr(self.gui, 'board_renderer', None), 'piece_images', {}).get(key)
+                    if img:
+                        display_images.append(img)
+            self.gui.current_setup_piece_display_images = display_images
             
             # Color-coded LEDs based on piece color (white or black)
             for piece_info in pieces:
@@ -2600,6 +2626,7 @@ class BaseGame(ABC):
         # Clear highlights
         self.gui.highlighted_squares = []
         self.gui.capture_squares = []
+        self.gui.current_setup_piece_display_images = []
         
         # Clear message
         self.temp_message = None
@@ -2648,6 +2675,7 @@ class BaseGame(ABC):
         # Clear highlights
         self.gui.highlighted_squares = []
         self.gui.capture_squares = []
+        self.gui.current_setup_piece_display_images = []
         
         # Success message
         self.show_temp_message("Setup complete! Game started.", duration=2)

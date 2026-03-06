@@ -137,6 +137,7 @@ class CheckersGUI:
         self.assisted_setup_mode = False
         self.assisted_setup_step = 0
         self.assisted_setup_waiting = False
+        self.current_setup_piece_display_images = []  # Piece icoontjes voor assisted setup notification
         self.highlighted_squares = {'destinations': [], 'intermediate': []}
         self.last_move_from = None  # Voor highlighting van laatste zet
         self.last_move_to = None
@@ -415,9 +416,11 @@ class CheckersGUI:
                 # Als message een list is, check de eerste regel
                 check_text = temp_message[0] if isinstance(temp_message, list) else temp_message
                 if 'mismatch' in check_text.lower() or 'invalid' in check_text.lower():
-                    UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='error')
+                    UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='error',
+                                               piece_images=self.current_setup_piece_display_images if self.assisted_setup_mode else None)
                 else:
-                    UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='warning')
+                    UIWidgets.draw_notification(self.screen, temp_message, board_width=self.board_size, board_height=self.board_size, notification_type='warning',
+                                               piece_images=self.current_setup_piece_display_images if self.assisted_setup_mode else None)
         
         # Voeg undo_button en update_rect toe aan result
         result['undo_button'] = self.undo_button
