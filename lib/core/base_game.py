@@ -1315,8 +1315,9 @@ class BaseGame(ABC):
                 self.leds.show()
                 # Clear tutorial squares from board
                 self.gui.tutorial_squares = {}
-                # Restart LED animator
-                self.led_animator.start_random_animation()
+                # Restart LED animator only if no game is active
+                if not self.game_started:
+                    self.led_animator.start_random_animation()
                 # Reset activity timer to prevent immediate screensaver
                 self.last_activity_time = time.time()
                 self.screen_dirty = True
@@ -2580,6 +2581,9 @@ class BaseGame(ABC):
         self.gui.assisted_setup_step = 0
         self.gui.assisted_setup_waiting = False
         self.gui.show_skip_setup_step_confirm = False
+        
+        # Zet game_started altijd op True - we gaan door met wat er op het bord staat
+        self.game_started = True
         
         # Clear LEDs
         self.leds.clear()
