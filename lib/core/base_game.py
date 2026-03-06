@@ -1079,64 +1079,72 @@ class BaseGame(ABC):
                             self.leds.set_led(move_sensor, 255, 255, 0, 0)
                     self.leds.show()
         else:
-            # Geen selectie - check voor checkmate
+            # Geen selectie - check voor game over (checkmate voor chess, wins voor checkers)
             if self.engine.is_game_over():
                 result = self.engine.get_game_result()
-                if 'checkmate' in result.lower():
+                # Check voor checkmate (chess) of wins (checkers)
+                if 'checkmate' in result.lower() or 'wins' in result.lower():
                     blink_on = (pygame.time.get_ticks() // 500) % 2 == 0
+                    
+                    # Bepaal winnaar en verliezer
+                    winner_color = None
+                    loser_color = None
+                    
+                    if 'checkmate' in result.lower():
+                        # Chess: bij checkmate is board.turn de kleur van de verliezer
+                        import chess
+                        loser_color = self.engine.board.turn
+                        winner_color = not loser_color
+                    elif 'white wins' in result.lower():
+                        # Checkers: White wins
+                        winner_color = 'white'
+                        loser_color = 'black'
+                    elif 'black wins' in result.lower():
+                        # Checkers: Black wins
+                        winner_color = 'black'
+                        loser_color = 'white'
                     
                     if blink_on:
                         self.leds.clear()
                         
-                        # Bij checkmate is board.turn de kleur van de verliezer
-                        import chess
-                        loser_color = self.engine.board.turn
-                        winner_color = not loser_color
-                        
-                        # Zoek beide koningen
+                        # Zoek alle stukken van winnaar en verliezer
                         for row in range(8):
                             for col in range(8):
                                 pos = f"{chr(65 + col)}{8 - row}"
                                 piece = self.engine.get_piece_at(pos)
                                 
-                                if piece and hasattr(piece, 'piece_type'):
-                                    # Chess piece (python-chess)
-                                    if piece.piece_type == chess.KING:
-                                        sensor_num = ChessMapper.chess_to_sensor(pos)
-                                        if sensor_num is not None:
-                                            # Winnaar = groen, verliezer = rood
-                                            if piece.color == winner_color:
+                                if piece:
+                                    sensor_num = ChessMapper.chess_to_sensor(pos)
+                                    if sensor_num is not None:
+                                        piece_color = None
+                                        
+                                        # Bepaal piece kleur (chess of checkers)
+                                        if hasattr(piece, 'piece_type'):
+                                            # Chess piece (python-chess)
+                                            import chess
+                                            piece_color = piece.color
+                                            # Vergelijk met winner_color en loser_color
+                                            if piece_color == winner_color:
                                                 self.leds.set_led(sensor_num, 0, 255, 0, 0)  # GROEN - winnaar
-                                            else:
+                                            elif piece_color == loser_color:
                                                 self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD - verliezer
-                        
-                        # Toon ook laatste zet in wit
-                        if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from and self.gui.last_move_to:
-                            from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
-                            to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
-                            if from_sensor is not None:
-                                self.leds.set_led(from_sensor, 100, 100, 100, 0)  # Wit
-                            if to_sensor is not None:
-                                self.leds.set_led(to_sensor, 100, 100, 100, 0)  # Wit
+                                        elif hasattr(piece, 'color'):
+                                            # Checkers piece (SimpleNamespace)
+                                            piece_color = piece.color  # 'white' or 'black'
+                                            # Vergelijk met winner_color en loser_color
+                                            if piece_color == winner_color:
+                                                self.leds.set_led(sensor_num, 0, 255, 0, 0)  # GROEN - winnaar
+                                            elif piece_color == loser_color:
+                                                self.leds.set_led(sensor_num, 255, 0, 0, 0)  # ROOD - verliezer
                         
                         self.leds.show()
                     else:
                         self.leds.clear()
-                        
-                        # Toon laatste zet ook tijdens "uit" fase van knipperen
-                        if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from and self.gui.last_move_to:
-                            from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
-                            to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
-                            if from_sensor is not None:
-                                self.leds.set_led(from_sensor, 100, 100, 100, 0)  # Wit
-                            if to_sensor is not None:
-                                self.leds.set_led(to_sensor, 100, 100, 100, 0)  # Wit
-                        
                         self.leds.show()
                     
                     # Update blink state
                     self.last_blink_state = blink_on
-                    return  # Skip andere LED updates bij checkmate
+                    return  # Skip andere LED updates bij game over
             
             # Reset blink state als er geen selectie is
             if self.last_blink_state is not None:
