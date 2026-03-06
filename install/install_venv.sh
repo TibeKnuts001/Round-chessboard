@@ -11,7 +11,9 @@ echo ""
 # Installeer system dependencies
 echo "Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y liblgpio-dev mpg123 libopenblas0
+sudo apt-get install -y liblgpio-dev mpg123 libopenblas0 \
+    libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+    libfreetype6-dev libportmidi-dev
 echo ""
 
 # Check of venv al bestaat
@@ -25,7 +27,7 @@ if [ -d "venv" ]; then
 else
     # Maak venv
     echo "Creating virtual environment..."
-    python3 -m venv venv
+    python3 -m venv --system-site-packages venv
 
     # Activeer venv
     echo "Activating venv..."

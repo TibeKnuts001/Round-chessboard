@@ -55,7 +55,7 @@ echo ""
 
 # Setup /dev/mem toegang voor LED hardware
 echo "6. Setting up /dev/mem access for LED hardware..."
-./install/install_mem_access.sh
+sudo ./install/install_mem_access.sh
 echo ""
 
 echo "╔════════════════════════════════════════╗"

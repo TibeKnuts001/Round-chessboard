@@ -262,8 +262,9 @@ class CheckersEngine(BaseEngine):
     
     def whose_turn(self):
         """Geef wiens beurt het is"""
-        # py-draughts: board.turn convention check
-        return "white" if self.board.turn else "black"
+        # py-draughts: board.turn is een Color enum
+        from draughts import Color
+        return "white" if self.board.turn == Color.WHITE else "black"
     
     def get_move_number(self):
         """Geef huidige move number"""
