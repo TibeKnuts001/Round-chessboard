@@ -83,6 +83,12 @@ class CheckersGame(BaseGame):
         kind = 'king' if piece.is_king else 'man'
         return f"{color}_{kind}"
     
+    def _is_computer_turn(self):
+        """Check of het de computer's beurt is voor checkers"""
+        if not self._is_vs_computer_enabled() or not self.ai:
+            return False
+        return self.engine.whose_turn() == self.computer_color
+    
     def _create_ai(self):
         """Maak AI als VS Computer enabled is"""
         # Check of we in checkers sectie zitten (niet chess)

@@ -93,6 +93,17 @@ class ChessGame(BaseGame):
             return None
         return piece.symbol()  # e.g. 'P', 'p', 'Q', 'q', 'K', 'k', etc.
     
+    def _is_computer_turn(self):
+        """Check of het de computer's beurt is op basis van geselecteerde kleur"""
+        if not self._is_vs_computer_enabled() or not self.ai:
+            return False
+        # board.turn is True voor wit, False voor zwart
+        return self.engine.board.turn == (self.computer_color == 'white')
+    
+    def _is_vs_computer_enabled(self):
+        """Check of VS Computer mode aan staat voor chess"""
+        return self.gui.settings.get('play_vs_computer', False, section='chess')
+    
     def _create_ai(self):
         """Maak Stockfish AI als VS Computer enabled is"""
         # Check of worstfish mode aan staat

@@ -29,6 +29,7 @@ Hoofdklasse:
 Wordt gebruikt door: ChessGUI (via EventHandlers)
 """
 
+import os
 import pygame
 
 
@@ -280,6 +281,165 @@ class DialogRenderer:
         self.screen.blit(cancel_text, cancel_text_rect)
         
         return yes_button, no_button, cancel_button
+    
+    def draw_color_selection_dialog(self, vs_computer=False, white_on_left=True, computer_plays='black'):
+        """
+        Teken color/side selection dialog voor start van nieuw spel.
+        
+        Args:
+            vs_computer: Of AI ook een kant kiest
+            white_on_left: True = wit links, False = zwart links
+            computer_plays: 'white' of 'black'
+        
+        Returns:
+            Tuple: (swap_button, confirm_button, cancel_button,
+                    computer_white_button, computer_black_button)
+        """
+        self._draw_overlay()
+        
+        dialog_height = 360 if vs_computer else 300
+        dialog_width = 520
+        dialog_x = (self.screen_width - dialog_width) // 2
+        dialog_y = (self.screen_height - dialog_height) // 2
+        
+        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height)
+        pygame.draw.rect(self.screen, self.COLOR_WHITE, dialog_rect, border_radius=15)
+        
+        # Title
+        title = self.font.render("Choose Sides", True, self.COLOR_BLACK)
+        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 32))
+        self.screen.blit(title, title_rect)
+        
+        # Subtitle
+        subtitle = self.font_small.render("Wie speelt welke kant van het bord?", True, (100, 100, 100))
+        subtitle_rect = subtitle.get_rect(center=(self.screen_width // 2, dialog_y + 60))
+        self.screen.blit(subtitle, subtitle_rect)
+        
+        # --- Color panels ---
+        panel_w = 155
+        panel_h = 100
+        panel_y = dialog_y + 85
+        left_panel_x = dialog_x + 40
+        right_panel_x = dialog_x + dialog_width - 40 - panel_w
+        
+        mouse_pos = pygame.mouse.get_pos()
+        
+        if white_on_left:
+            left_color, left_label, left_text_color = (240, 240, 240), "Wit", (30, 30, 30)
+            right_color, right_label, right_text_color = (30, 30, 30), "Zwart", (220, 220, 220)
+        else:
+            left_color, left_label, left_text_color = (30, 30, 30), "Zwart", (220, 220, 220)
+            right_color, right_label, right_text_color = (240, 240, 240), "Wit", (30, 30, 30)
+        
+        # Left panel
+        left_panel_rect = pygame.Rect(left_panel_x, panel_y, panel_w, panel_h)
+        pygame.draw.rect(self.screen, left_color, left_panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, (180, 180, 180), left_panel_rect, 2, border_radius=12)
+        left_label_surf = self.font.render(left_label, True, left_text_color)
+        left_label_rect = left_label_surf.get_rect(center=left_panel_rect.center)
+        self.screen.blit(left_label_surf, left_label_rect)
+        
+        left_sub = self.font_small.render("Links", True, (130, 130, 130))
+        self.screen.blit(left_sub, (left_panel_x + (panel_w - left_sub.get_width()) // 2, panel_y + panel_h + 6))
+        
+        # Right panel
+        right_panel_rect = pygame.Rect(right_panel_x, panel_y, panel_w, panel_h)
+        pygame.draw.rect(self.screen, right_color, right_panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, (180, 180, 180), right_panel_rect, 2, border_radius=12)
+        right_label_surf = self.font.render(right_label, True, right_text_color)
+        right_label_rect = right_label_surf.get_rect(center=right_panel_rect.center)
+        self.screen.blit(right_label_surf, right_label_rect)
+        
+        right_sub = self.font_small.render("Rechts", True, (130, 130, 130))
+        self.screen.blit(right_sub, (right_panel_x + (panel_w - right_sub.get_width()) // 2, panel_y + panel_h + 6))
+        
+        # Swap button (center)
+        swap_cx = self.screen_width // 2
+        swap_cy = panel_y + panel_h // 2
+        swap_button = pygame.Rect(swap_cx - 30, swap_cy - 22, 60, 44)
+        swap_hover = swap_button.collidepoint(mouse_pos)
+        swap_bg = (100, 160, 230) if swap_hover else (70, 130, 200)
+        pygame.draw.rect(self.screen, swap_bg, swap_button, border_radius=10)
+        # Laad switch icon (eenmalig, gecached op instance)
+        if not hasattr(self, '_switch_icon'):
+            icon_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                'assets', 'switch.png'
+            )
+            try:
+                raw = pygame.image.load(icon_path).convert_alpha()
+                icon_size = min(swap_button.width - 10, swap_button.height - 10)
+                self._switch_icon = pygame.transform.smoothscale(raw, (icon_size, icon_size))
+            except Exception:
+                self._switch_icon = None
+        if self._switch_icon:
+            icon_r = self._switch_icon.get_rect(center=swap_button.center)
+            self.screen.blit(self._switch_icon, icon_r)
+        else:
+            swap_label = self.font_small.render("< >", True, (255, 255, 255))
+            self.screen.blit(swap_label, swap_label.get_rect(center=swap_button.center))
+        
+        # --- AI section (if vs computer) ---
+        computer_white_button = None
+        computer_black_button = None
+        
+        if vs_computer:
+            ai_y = panel_y + panel_h + 40
+            ai_label = self.font_small.render("Computer:", True, self.COLOR_BLACK)
+            self.screen.blit(ai_label, (dialog_x + 40, ai_y))
+            
+            btn_w = 100
+            btn_h = 38
+            btn_gap = 14
+            btn_start_x = self.screen_width // 2 - btn_w - btn_gap // 2
+            
+            computer_white_button = pygame.Rect(btn_start_x, ai_y - 5, btn_w, btn_h)
+            computer_black_button = pygame.Rect(btn_start_x + btn_w + btn_gap, ai_y - 5, btn_w, btn_h)
+            
+            # White button
+            w_active = computer_plays == 'white'
+            w_bg = (50, 150, 50) if w_active else ((80, 80, 80) if computer_white_button.collidepoint(mouse_pos) else (60, 60, 60))
+            pygame.draw.rect(self.screen, w_bg, computer_white_button, border_radius=8)
+            if w_active:
+                pygame.draw.rect(self.screen, (100, 255, 100), computer_white_button, 2, border_radius=8)
+            w_text = self.font_small.render("Wit", True, (255, 255, 255))
+            self.screen.blit(w_text, w_text.get_rect(center=computer_white_button.center))
+            
+            # Black button
+            b_active = computer_plays == 'black'
+            b_bg = (50, 150, 50) if b_active else ((80, 80, 80) if computer_black_button.collidepoint(mouse_pos) else (60, 60, 60))
+            pygame.draw.rect(self.screen, b_bg, computer_black_button, border_radius=8)
+            if b_active:
+                pygame.draw.rect(self.screen, (100, 255, 100), computer_black_button, 2, border_radius=8)
+            b_text = self.font_small.render("Zwart", True, (255, 255, 255))
+            self.screen.blit(b_text, b_text.get_rect(center=computer_black_button.center))
+        
+        # --- Confirm / Cancel buttons ---
+        confirm_button = pygame.Rect(
+            self.screen_width // 2 - 150,
+            dialog_y + dialog_height - 65,
+            130,
+            50
+        )
+        cancel_button = pygame.Rect(
+            self.screen_width // 2 + 20,
+            dialog_y + dialog_height - 65,
+            130,
+            50
+        )
+        
+        confirm_color = (60, 180, 60) if confirm_button.collidepoint(mouse_pos) else (50, 150, 50)
+        pygame.draw.rect(self.screen, confirm_color, confirm_button, border_radius=10)
+        confirm_text = self.font_small.render("Bevestigen", True, self.COLOR_WHITE)
+        self.screen.blit(confirm_text, confirm_text.get_rect(center=confirm_button.center))
+        
+        cancel_color = (140, 140, 140) if cancel_button.collidepoint(mouse_pos) else (100, 100, 100)
+        pygame.draw.rect(self.screen, cancel_color, cancel_button, border_radius=10)
+        cancel_text = self.font_small.render("Annuleren", True, self.COLOR_WHITE)
+        self.screen.blit(cancel_text, cancel_text.get_rect(center=cancel_button.center))
+        
+        return (swap_button, confirm_button, cancel_button,
+                computer_white_button, computer_black_button)
     
     def draw_stop_game_confirm_dialog(self):
         """

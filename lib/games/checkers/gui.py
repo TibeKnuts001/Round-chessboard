@@ -133,6 +133,9 @@ class CheckersGUI:
         self.show_undo_confirm = False  # Voor undo confirmation
         self.show_power_dropdown = False
         self.show_update_status_dialog = False  # Voor update status dialog
+        self.show_color_selection = False  # Voor kleur/kant selectie voor nieuw spel
+        self.color_selection_white_on_left = True  # True = wit links, False = zwart links
+        self.color_selection_computer_plays = 'black'  # 'white' of 'black'
         self.update_info = {}  # Update status information
         self.assisted_setup_mode = False
         self.assisted_setup_step = 0
@@ -370,8 +373,9 @@ class CheckersGUI:
         # Teken debug overlays op board_surface
         self.draw_debug_overlays()
         
-        # Roteer board 90° met de klok mee
-        rotated_board = pygame.transform.rotate(self.board_surface, -90)  # -90 = clockwise
+        # Roteer board: -90° (clockwise) als wit links staat, +90° als wit rechts
+        rotation_angle = -90 if self.color_selection_white_on_left else 90
+        rotated_board = pygame.transform.rotate(self.board_surface, rotation_angle)  # -90 = clockwise
         
         # Blit geroteerd board naar main screen
         self.screen.blit(rotated_board, (0, 0))
@@ -390,6 +394,19 @@ class CheckersGUI:
             stop_game_yes_button, stop_game_no_button = self.dialog_renderer.draw_stop_game_confirm_dialog()
             result['stop_game_yes'] = stop_game_yes_button
             result['stop_game_no'] = stop_game_no_button
+        elif self.show_color_selection:
+            vs_computer = self.settings.get('play_vs_computer', False, section='checkers')
+            (color_sel_swap_button, color_sel_confirm_button, color_sel_cancel_button,
+             color_sel_comp_white_button, color_sel_comp_black_button) = self.dialog_renderer.draw_color_selection_dialog(
+                vs_computer=vs_computer,
+                white_on_left=self.color_selection_white_on_left,
+                computer_plays=self.color_selection_computer_plays
+            )
+            result['color_sel_swap'] = color_sel_swap_button
+            result['color_sel_confirm'] = color_sel_confirm_button
+            result['color_sel_cancel'] = color_sel_cancel_button
+            result['color_sel_comp_white'] = color_sel_comp_white_button
+            result['color_sel_comp_black'] = color_sel_comp_black_button
         elif self.show_new_game_confirm:
             new_game_normal_button, new_game_assisted_button, new_game_cancel_button = self.dialog_renderer.draw_new_game_confirm_dialog()
             result['new_game_normal'] = new_game_normal_button
@@ -422,7 +439,7 @@ class CheckersGUI:
         
         # Temp message overlay - alleen als GEEN dialogs open zijn
         if temp_message and pygame.time.get_ticks() < temp_message_timer:
-            if not (self.show_settings or self.show_exit_confirm or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm or self.show_update_status_dialog):
+            if not (self.show_settings or self.show_exit_confirm or self.show_color_selection or self.show_new_game_confirm or self.show_stop_game_confirm or self.show_skip_setup_step_confirm or self.show_undo_confirm or self.show_update_status_dialog):
                 # Kies notification type op basis van message content
                 # Als message een list is, check de eerste regel
                 check_text = temp_message[0] if isinstance(temp_message, list) else temp_message
@@ -464,13 +481,19 @@ class CheckersGUI:
     
     def get_square_from_pos(self, pos):
         """Converteer mouse pos naar chess notatie (delegates to BoardRenderer)"""
-        # Het bord wordt 90° clockwise gedraaid (-90°) voor weergave
-        # Transformeer de klik positie terug naar originele board coördinaten
+        # Het bord wordt 90° clockwise gedraaid (-90°) voor weergave als wit links staat,
+        # of counter-clockwise (+90°) als wit rechts staat.
+        # Transformeer de klik positie terug naar originele board coördinaten.
         x_click, y_click = pos
         
-        # Voor -90° rotatie inverse: origineel = (y, board_size - x)
-        x_board = y_click
-        y_board = self.board_size - x_click
+        if self.color_selection_white_on_left:
+            # Inverse van -90°: origineel = (y, board_size - x)
+            x_board = y_click
+            y_board = self.board_size - x_click
+        else:
+            # Inverse van +90°: origineel = (board_size - y, x)
+            x_board = self.board_size - y_click
+            y_board = x_click
         
         return self.board_renderer.get_square_from_pos((x_board, y_board))
     

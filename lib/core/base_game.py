@@ -86,6 +86,7 @@ class BaseGame(ABC):
         self.last_gui_result = {}  # Cache laatste gui_result voor button detection
         self.ai_move_pending = None  # Track AI move execution: {'from': pos, 'to': pos, 'intermediate': [], 'piece_removed': False}
         self.castling_pending = None  # Track castling rook movement: {'rook_from': pos, 'rook_to': pos, 'rook_removed': False}
+        self.computer_color = 'black'  # Welke kleur de computer speelt ('white' of 'black')
         
         # Tutorial mode variables
         self.tutorial_active = False
@@ -146,6 +147,92 @@ class BaseGame(ABC):
             if hasattr(self.gui, 'last_board_fen'):
                 self.gui.last_board_fen = None
             self.screen_dirty = True
+    
+    def _apply_color_selection(self):
+        """
+        Pas de kleur/kant selectie toe op de board renderer.
+        white_on_left=True → zwart rechts → zwart stukken geroteerd
+        white_on_left=False → wit rechts → wit stukken geroteerd
+        """
+        white_on_left = getattr(self.gui, 'color_selection_white_on_left', True)
+        self.computer_color = getattr(self.gui, 'color_selection_computer_plays', 'black')
+        
+        if hasattr(self.gui, 'board_renderer'):
+            # Chess renderer gebruikt bool (piece.color is True/False)
+            # Checkers renderer gebruikt string ('white'/'black')
+            if 'Checkers' in self.__class__.__name__:
+                # white_on_left → black on right → black rotated
+                self.gui.board_renderer.rotated_color = 'black' if white_on_left else 'white'
+            else:
+                # white_on_left=True → not True = False = black rotated
+                self.gui.board_renderer.rotated_color = not white_on_left
+        
+        # Force cache refresh
+        self.gui.cached_pieces = None
+        self.gui.cached_board = None  # Reset board cache zodat rotated_color direct zichtbaar is
+        if hasattr(self.gui, 'last_board_state'):
+            self.gui.last_board_state = None
+        if hasattr(self.gui, 'last_board_fen'):
+            self.gui.last_board_fen = None
+        self.screen_dirty = True
+        print(f"Kleur selectie toegepast: wit {'links' if white_on_left else 'rechts'}, computer speelt {self.computer_color}")
+    
+    def _is_computer_turn(self):
+        """
+        Check of het de beurt is van de computer.
+        Kan worden overschreven door subclasses (chess, checkers).
+        """
+        return False
+
+    @staticmethod
+    def _flip_square(square):
+        """Flip square 180°: A1↔H8, B2↔G7, etc.
+
+        Used when the board is displayed from the opponent's side (white_on_left=False),
+        so that hardware sensor/LED positions match the displayed orientation.
+        """
+        if not square or len(square) < 2:
+            return square
+        col = chr(137 - ord(square[0].upper()))  # A↔H, B↔G, C↔F, D↔E
+        rank = str(9 - int(square[1]))            # 1↔8, 2↔7, 3↔6, 4↔5
+        return col + rank
+
+    def _orient_square(self, square):
+        """Apply board orientation to a square name.
+
+        When white_on_left=False the physical board is rotated 180° relative to
+        the display, so all sensor/LED square names must be flipped.
+        """
+        if not getattr(self.gui, 'color_selection_white_on_left', True):
+            return self._flip_square(square)
+        return square
+    
+    def _set_color_selection_leds(self):
+        """
+        Zet LEDs om kleur selectie te tonen:
+        - Linker helft van bord (ranks 1-4) in wit als white_on_left=True, anders dim
+        - Rechter helft (ranks 5-8) in wit als white_on_left=False, anders dim
+        """
+        white_on_left = getattr(self.gui, 'color_selection_white_on_left', True)
+        self.leds.clear()
+        
+        for col in range(8):
+            for rank in range(8):  # 0-indexed rank
+                square_name = f"{chr(65 + col)}{rank + 1}"  # A1-H8
+                sensor = ChessMapper.chess_to_sensor(square_name)
+                if sensor is None:
+                    continue
+                
+                is_left_side = rank < 4  # ranks 0-3 = linker helft, 4-7 = rechter helft
+                
+                if is_left_side == white_on_left:
+                    # Witte kant: helder wit
+                    self.leds.set_led(sensor, 80, 80, 80, 0)
+                else:
+                    # Zwarte kant: oranje (zelfde als bij assisted setup)
+                    self.leds.set_led(sensor, 200, 100, 0, 0)
+        
+        self.leds.show()
     
     @abstractmethod
     def _create_gui(self, engine):
@@ -220,7 +307,7 @@ class BaseGame(ABC):
         # Inverse logica: LOW = magneet aanwezig (stuk staat er)
         active_sensors = {}
         for i in range(64):
-            pos = ChessMapper.sensor_to_chess(i)  # TODO: Gebruik board_notation_to_sensor mapping
+            pos = self._orient_square(ChessMapper.sensor_to_chess(i))  # TODO: Gebruik board_notation_to_sensor mapping
             if pos:
                 # True = stuk staat op veld (sensor LOW)
                 active_sensors[pos] = not sensor_values[i]
@@ -319,14 +406,14 @@ class BaseGame(ABC):
         
         # Light up normal move positions
         for pos in positions:
-            sensor_num = ChessMapper.chess_to_sensor(pos)  # TODO: Gebruik board mapping
+            sensor_num = ChessMapper.chess_to_sensor(self._orient_square(pos))  # TODO: Gebruik board mapping
             if sensor_num is not None:
                 r, g, b, w = color
                 self.leds.set_led(sensor_num, r, g, b, w)
         
         # Light up capture positions (rood)
         for pos in capture_positions:
-            sensor_num = ChessMapper.chess_to_sensor(pos)
+            sensor_num = ChessMapper.chess_to_sensor(self._orient_square(pos))
             if sensor_num is not None:
                 r, g, b, w = capture_color
                 self.leds.set_led(sensor_num, r, g, b, w)
@@ -416,6 +503,9 @@ class BaseGame(ABC):
                 # Haal capture_squares op van GUI (na highlight_squares call)
                 capture_squares = getattr(self.gui, 'capture_squares', [])
                 normal_squares = getattr(self.gui, 'highlighted_squares', all_moves)
+                # highlighted_squares kan een dict zijn (checkers) of list (chess)
+                if isinstance(normal_squares, dict):
+                    normal_squares = normal_squares.get('destinations', [])
                 
                 # Groen voor normale moves, rood voor captures
                 self.update_leds(
@@ -459,8 +549,8 @@ class BaseGame(ABC):
                 rook_from = self.castling_pending.get('rook_from')
                 rook_to = self.castling_pending.get('rook_to')
                 
-                from_sensor = ChessMapper.chess_to_sensor(rook_from) if rook_from else None
-                to_sensor = ChessMapper.chess_to_sensor(rook_to) if rook_to else None
+                from_sensor = ChessMapper.chess_to_sensor(self._orient_square(rook_from)) if rook_from else None
+                to_sensor = ChessMapper.chess_to_sensor(self._orient_square(rook_to)) if rook_to else None
                 
                 if from_sensor is not None:
                     self.leds.set_led(from_sensor, 100, 100, 100, 20)  # WIT
@@ -511,8 +601,8 @@ class BaseGame(ABC):
                 to_pos_orig = self.ai_move_pending.get('to')
                 intermediate = self.ai_move_pending.get('intermediate', [])
                 
-                from_sensor = ChessMapper.chess_to_sensor(from_pos) if from_pos else None
-                to_sensor = ChessMapper.chess_to_sensor(to_pos_orig) if to_pos_orig else None
+                from_sensor = ChessMapper.chess_to_sensor(self._orient_square(from_pos)) if from_pos else None
+                to_sensor = ChessMapper.chess_to_sensor(self._orient_square(to_pos_orig)) if to_pos_orig else None
                 
                 if from_sensor is not None:
                     self.leds.set_led(from_sensor, 100, 100, 100, 20)  # WIT
@@ -521,7 +611,7 @@ class BaseGame(ABC):
                 
                 # Toon intermediate positions in paars
                 for inter_pos in intermediate:
-                    inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                    inter_sensor = ChessMapper.chess_to_sensor(self._orient_square(inter_pos))
                     if inter_sensor is not None:
                         self.leds.set_led(inter_sensor, 80, 0, 80, 0)  # Paars
                 
@@ -649,7 +739,7 @@ class BaseGame(ABC):
                         self.sound_manager.play_check()
                     
                     # Als VS Computer aan staat, laat computer zet doen
-                    if self._is_vs_computer_enabled() and self.ai:
+                    if self._is_computer_turn():
                         # Eerst GUI hertekenen met player move
                         self.screen.fill(self.gui.COLOR_BG)
                         self.gui.draw_board()
@@ -907,8 +997,8 @@ class BaseGame(ABC):
                 rook_from = self.castling_pending.get('rook_from')
                 rook_to = self.castling_pending.get('rook_to')
                 
-                from_sensor = ChessMapper.chess_to_sensor(rook_from) if rook_from else None
-                to_sensor = ChessMapper.chess_to_sensor(rook_to) if rook_to else None
+                from_sensor = ChessMapper.chess_to_sensor(self._orient_square(rook_from)) if rook_from else None
+                to_sensor = ChessMapper.chess_to_sensor(self._orient_square(rook_to)) if rook_to else None
                 
                 self.leds.clear()
                 if from_sensor is not None:
@@ -934,8 +1024,8 @@ class BaseGame(ABC):
                 to_pos = self.ai_move_pending.get('to')
                 intermediate = self.ai_move_pending.get('intermediate', [])
                 
-                from_sensor = ChessMapper.chess_to_sensor(from_pos) if from_pos else None
-                to_sensor = ChessMapper.chess_to_sensor(to_pos) if to_pos else None
+                from_sensor = ChessMapper.chess_to_sensor(self._orient_square(from_pos)) if from_pos else None
+                to_sensor = ChessMapper.chess_to_sensor(self._orient_square(to_pos)) if to_pos else None
                 
                 self.leds.clear()
                 if from_sensor is not None:
@@ -945,7 +1035,7 @@ class BaseGame(ABC):
                 
                 # Toon intermediate positions in geel (voor multi-captures)
                 for pos in intermediate:
-                    inter_sensor = ChessMapper.chess_to_sensor(pos)
+                    inter_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                     if inter_sensor is not None:
                         self.leds.set_led(inter_sensor, 255, 255, 0, 0)  # GEEL
                 
@@ -970,7 +1060,7 @@ class BaseGame(ABC):
             self.screen_dirty = True  # Herteken voor blinking selection indicator
             
             # Bereken legal moves 1x (voorkom herberekening die flikkering veroorzaakt)
-            sensor_num = ChessMapper.chess_to_sensor(self.selected_square)
+            sensor_num = ChessMapper.chess_to_sensor(self._orient_square(self.selected_square))
             legal_moves = self.engine.get_legal_moves_from(self.selected_square)
             
             # Parse legal_moves (kan list of dict zijn voor checkers multi-captures)
@@ -995,19 +1085,19 @@ class BaseGame(ABC):
                         
                         # Groen voor normale moves
                         for pos in normal_squares:
-                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
                         
                         # Rood voor captures (donkerder dan violation rood)
                         for pos in capture_squares:
-                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 200, 0, 0, 0)  # Donker rood voor captures
                         
                         # Geel voor intermediate (tussenposities bij multi-captures)
                         for pos in intermediate:
-                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 255, 255, 0, 0)  # GEEL
                         self.leds.show()
@@ -1021,19 +1111,19 @@ class BaseGame(ABC):
                     
                     # Groen voor normale moves
                     for pos in normal_squares:
-                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 0, 255, 0, 0)
                     
                     # Rood voor captures
                     for pos in capture_squares:
-                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 255, 0, 0, 0)
                     
                     # Geel voor intermediate
                     for pos in intermediate:
-                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 255, 255, 0, 0)
                     self.leds.show()
@@ -1052,19 +1142,19 @@ class BaseGame(ABC):
                         
                         # Groen voor normale moves
                         for pos in normal_squares:
-                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 0, 255, 0, 0)  # GROEN
                         
                         # Rood voor captures
                         for pos in capture_squares:
-                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 255, 0, 0, 0)  # ROOD
                         
                         # Geel voor intermediate
                         for pos in intermediate:
-                            move_sensor = ChessMapper.chess_to_sensor(pos)
+                            move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                             if move_sensor is not None:
                                 self.leds.set_led(move_sensor, 255, 255, 0, 0)  # GEEL
                         self.leds.show()
@@ -1080,19 +1170,19 @@ class BaseGame(ABC):
                     
                     # Groen voor normale moves
                     for pos in normal_squares:
-                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 0, 255, 0, 0)
                     
                     # Rood voor captures
                     for pos in capture_squares:
-                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 255, 0, 0, 0)
                     
                     # Geel voor intermediate
                     for pos in intermediate:
-                        move_sensor = ChessMapper.chess_to_sensor(pos)
+                        move_sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                         if move_sensor is not None:
                             self.leds.set_led(move_sensor, 255, 255, 0, 0)
                     self.leds.show()
@@ -1132,7 +1222,7 @@ class BaseGame(ABC):
                                 piece = self.engine.get_piece_at(pos)
                                 
                                 if piece:
-                                    sensor_num = ChessMapper.chess_to_sensor(pos)
+                                    sensor_num = ChessMapper.chess_to_sensor(self._orient_square(pos))
                                     if sensor_num is not None:
                                         piece_color = None
                                         
@@ -1171,8 +1261,8 @@ class BaseGame(ABC):
                 
                 # Toon laatste zet in dim wit (als die bestaat)
                 if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from and self.gui.last_move_to:
-                    from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
-                    to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
+                    from_sensor = ChessMapper.chess_to_sensor(self._orient_square(self.gui.last_move_from))
+                    to_sensor = ChessMapper.chess_to_sensor(self._orient_square(self.gui.last_move_to))
                     if from_sensor is not None:
                         self.leds.set_led(from_sensor, 30, 30, 30, 10)  # Dim wit
                     if to_sensor is not None:
@@ -1181,7 +1271,7 @@ class BaseGame(ABC):
                     # Toon ook intermediate squares in paars/magenta
                     if hasattr(self.gui, 'last_move_intermediate'):
                         for inter_pos in self.gui.last_move_intermediate:
-                            inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                            inter_sensor = ChessMapper.chess_to_sensor(self._orient_square(inter_pos))
                             if inter_sensor is not None:
                                 self.leds.set_led(inter_sensor, 40, 0, 40, 0)  # Dim paars/magenta
                 
@@ -1192,22 +1282,22 @@ class BaseGame(ABC):
         if not self.board_mismatch_positions and self.previous_mismatch_positions:
             # Clear alle vorige mismatch LEDs
             for pos in self.previous_mismatch_positions:
-                sensor_num = ChessMapper.chess_to_sensor(pos)
+                sensor_num = ChessMapper.chess_to_sensor(self._orient_square(pos))
                 if sensor_num is not None:
                     self.leds.set_led(sensor_num, 0, 0, 0, 0)
             
             # Herstel last move LEDs (dim wit)
             if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from:
-                from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
+                from_sensor = ChessMapper.chess_to_sensor(self._orient_square(self.gui.last_move_from))
                 if from_sensor is not None:
                     self.leds.set_led(from_sensor, 30, 30, 30, 10)
             if hasattr(self.gui, 'last_move_to') and self.gui.last_move_to:
-                to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
+                to_sensor = ChessMapper.chess_to_sensor(self._orient_square(self.gui.last_move_to))
                 if to_sensor is not None:
                     self.leds.set_led(to_sensor, 30, 30, 30, 10)
             if hasattr(self.gui, 'last_move_intermediate'):
                 for inter_pos in self.gui.last_move_intermediate:
-                    inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                    inter_sensor = ChessMapper.chess_to_sensor(self._orient_square(inter_pos))
                     if inter_sensor is not None:
                         self.leds.set_led(inter_sensor, 40, 0, 40, 0)
             
@@ -1226,13 +1316,13 @@ class BaseGame(ABC):
             # Clear LEDs voor posities die niet meer in mismatch list zitten
             for pos in self.previous_mismatch_positions:
                 if pos not in self.board_mismatch_positions:
-                    sensor_num = ChessMapper.chess_to_sensor(pos)
+                    sensor_num = ChessMapper.chess_to_sensor(self._orient_square(pos))
                     if sensor_num is not None:
                         self.leds.set_led(sensor_num, 0, 0, 0, 0)
             
             # Zet rode LEDs voor huidige mismatches
             for pos in self.board_mismatch_positions:
-                sensor_num = ChessMapper.chess_to_sensor(pos)
+                sensor_num = ChessMapper.chess_to_sensor(self._orient_square(pos))
                 if sensor_num is not None:
                     if blink_on:
                         # Rood knipperen voor elke mismatch (missing of extra piece)
@@ -1420,8 +1510,8 @@ class BaseGame(ABC):
                         if self.engine.is_game_over():
                             print(f"\n*** {self.engine.get_game_result()} ***\n")
                         else:
-                            # Als VS Computer aan staat, laat computer zet doen
-                            if self._is_vs_computer_enabled() and self.ai:
+                            # Als het de beurt is van de computer, laat hem spelen
+                            if self._is_computer_turn():
                                 self.screen.fill(self.gui.COLOR_BG)
                                 self.gui.draw_board()
                                 self.gui.draw_pieces()
@@ -1441,6 +1531,38 @@ class BaseGame(ABC):
             elif self.gui.handle_exit_no_click(pos, exit_no_button):
                 pass
         
+        # Color selection dialog (verschijnt voor new game confirm)
+        elif hasattr(self.gui, 'show_color_selection') and self.gui.show_color_selection:
+            swap_btn = gui_result.get('color_sel_swap')
+            confirm_btn = gui_result.get('color_sel_confirm')
+            cancel_btn = gui_result.get('color_sel_cancel')
+            comp_white_btn = gui_result.get('color_sel_comp_white')
+            comp_black_btn = gui_result.get('color_sel_comp_black')
+            
+            if swap_btn and swap_btn.collidepoint(pos):
+                self.gui.color_selection_white_on_left = not self.gui.color_selection_white_on_left
+                self._set_color_selection_leds()
+                self.screen_dirty = True
+            elif comp_white_btn and comp_white_btn.collidepoint(pos):
+                self.gui.color_selection_computer_plays = 'white'
+                self.screen_dirty = True
+            elif comp_black_btn and comp_black_btn.collidepoint(pos):
+                self.gui.color_selection_computer_plays = 'black'
+                self.screen_dirty = True
+            elif confirm_btn and confirm_btn.collidepoint(pos):
+                self.gui.show_color_selection = False
+                self.gui.show_new_game_confirm = True
+                self.screen_dirty = True
+            elif cancel_btn and cancel_btn.collidepoint(pos):
+                self.gui.show_color_selection = False
+                # Zet LEDs terug naar idle
+                if not self.game_started:
+                    self.led_animator.start_random_animation()
+                else:
+                    self.leds.clear()
+                    self.leds.show()
+                self.screen_dirty = True
+        
         # New game confirmation dialog
         elif self.gui.show_new_game_confirm:
             if self.gui.handle_new_game_normal_click(pos, new_game_normal_button):
@@ -1452,7 +1574,7 @@ class BaseGame(ABC):
                 self._clear_selection()
                 
                 # Detecteer welke kleur rechts staat en roteer die
-                self._update_rotated_color()
+                self._apply_color_selection()
                 
                 # Stop LED animatie - spel is nu actief
                 self.led_animator.stop()
@@ -1465,6 +1587,16 @@ class BaseGame(ABC):
                 self.leds.clear()
                 self.leds.show()
                 
+                # Als computer wit speelt (wit begint), start computer move direct
+                if self._is_computer_turn():
+                    self.screen.fill(self.gui.COLOR_BG)
+                    self.gui.draw_board()
+                    self.gui.draw_pieces()
+                    self.gui.draw_debug_overlays()
+                    self.gui.draw_sidebar()
+                    pygame.display.flip()
+                    self.make_computer_move()
+                
                 # Forceer screen redraw voor nieuwe button layout
                 self.screen_dirty = True
                 
@@ -1474,6 +1606,9 @@ class BaseGame(ABC):
                 self.game_started = False  # Blijft False tot setup compleet
                 self.gui.show_new_game_confirm = False
                 self._clear_selection()
+                
+                # Pas kleur selectie toe
+                self._apply_color_selection()
                 
                 # Stop LED animatie - assisted setup neemt over
                 self.led_animator.stop()
@@ -1705,16 +1840,16 @@ class BaseGame(ABC):
         
         # Clear old last move LEDs first (before updating to new last move)
         if hasattr(self.gui, 'last_move_from') and self.gui.last_move_from:
-            from_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_from)
+            from_sensor = ChessMapper.chess_to_sensor(self._orient_square(self.gui.last_move_from))
             if from_sensor is not None:
                 self.leds.set_led(from_sensor, 0, 0, 0, 0)
         if hasattr(self.gui, 'last_move_to') and self.gui.last_move_to:
-            to_sensor = ChessMapper.chess_to_sensor(self.gui.last_move_to)
+            to_sensor = ChessMapper.chess_to_sensor(self._orient_square(self.gui.last_move_to))
             if to_sensor is not None:
                 self.leds.set_led(to_sensor, 0, 0, 0, 0)
         if hasattr(self.gui, 'last_move_intermediate'):
             for inter_pos in self.gui.last_move_intermediate:
-                inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                inter_sensor = ChessMapper.chess_to_sensor(self._orient_square(inter_pos))
                 if inter_sensor is not None:
                     self.leds.set_led(inter_sensor, 0, 0, 0, 0)
         
@@ -1734,8 +1869,8 @@ class BaseGame(ABC):
                     print(f"  Intermediate (rook): {intermediate}")
                 
                 # Turn on new last move LEDs - koning in dim wit
-                from_sensor = ChessMapper.chess_to_sensor(from_square)
-                to_sensor = ChessMapper.chess_to_sensor(to_square)
+                from_sensor = ChessMapper.chess_to_sensor(self._orient_square(from_square))
+                to_sensor = ChessMapper.chess_to_sensor(self._orient_square(to_square))
                 if from_sensor is not None:
                     self.leds.set_led(from_sensor, 30, 30, 30, 10)  # Dim wit
                 if to_sensor is not None:
@@ -1743,7 +1878,7 @@ class BaseGame(ABC):
                 
                 # Turn on intermediate LEDs - rook in magenta (zoals checkers intermediate)
                 for inter_pos in intermediate:
-                    inter_sensor = ChessMapper.chess_to_sensor(inter_pos)
+                    inter_sensor = ChessMapper.chess_to_sensor(self._orient_square(inter_pos))
                     if inter_sensor is not None:
                         self.leds.set_led(inter_sensor, 40, 0, 40, 0)  # Magenta
             else:
@@ -1782,8 +1917,11 @@ class BaseGame(ABC):
             if self.game_started:
                 self.gui.show_stop_game_confirm = True
             else:
-                # Toon new game confirmation
-                self.gui.show_new_game_confirm = True
+                # Stop LED animatie VOOR het tonen van de kleur LEDs
+                self.led_animator.stop()
+                # Toon color selectie
+                self.gui.show_color_selection = True
+                self._set_color_selection_leds()
             return
         
         # Undo button - alleen actief als spel gestart is
@@ -2030,7 +2168,7 @@ class BaseGame(ABC):
             
             # Red LEDs for pieces to remove
             for square in squares:
-                sensor_num = ChessMapper.chess_to_sensor(square)
+                sensor_num = ChessMapper.chess_to_sensor(self._orient_square(square))
                 if sensor_num is not None:
                     self.leds.set_led(sensor_num, 255, 0, 0, 0)  # RED
             
@@ -2079,7 +2217,7 @@ class BaseGame(ABC):
             for piece_info in pieces:
                 square = piece_info['pos']
                 piece = piece_info['piece']
-                sensor_num = ChessMapper.chess_to_sensor(square)
+                sensor_num = ChessMapper.chess_to_sensor(self._orient_square(square))
                 if sensor_num is not None:
                     # White pieces: white LED, Black pieces: orange LED
                     if self._is_white_piece(piece):
@@ -2116,7 +2254,7 @@ class BaseGame(ABC):
             
             # Update LEDs for individual pieces - turn off when removed
             for square in squares:
-                sensor_num = ChessMapper.chess_to_sensor(square)
+                sensor_num = ChessMapper.chess_to_sensor(self._orient_square(square))
                 if sensor_num is not None:
                     is_removed = not current_sensors.get(square, False)
                     if is_removed:
@@ -2141,7 +2279,7 @@ class BaseGame(ABC):
             for piece_info in pieces:
                 square = piece_info['pos']
                 piece = piece_info['piece']
-                sensor_num = ChessMapper.chess_to_sensor(square)
+                sensor_num = ChessMapper.chess_to_sensor(self._orient_square(square))
                 if sensor_num is not None:
                     is_placed = current_sensors.get(square, False)
                     if is_placed:
@@ -2208,7 +2346,7 @@ class BaseGame(ABC):
         # Light up all squares in this row
         for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
             pos = f"{col}{row_num}"
-            sensor = ChessMapper.chess_to_sensor(pos)
+            sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
             if sensor is not None:
                 # Cyan color for rows
                 self.leds.set_led(sensor, 0, 255, 255, 0)
@@ -2228,7 +2366,7 @@ class BaseGame(ABC):
         # Light up all squares in this column
         for row in range(1, 9):
             pos = f"{col}{row}"
-            sensor = ChessMapper.chess_to_sensor(pos)
+            sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
             if sensor is not None:
                 # Cyan color for columns (same as rows)
                 self.leds.set_led(sensor, 0, 255, 255, 0)
@@ -2271,7 +2409,7 @@ class BaseGame(ABC):
         
         # Light up the diagonal
         for pos in squares:
-            sensor = ChessMapper.chess_to_sensor(pos)
+            sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
             if sensor is not None:
                 # Cyan color for diagonals (same as rows)
                 self.leds.set_led(sensor, 0, 255, 255, 0)
@@ -2314,7 +2452,7 @@ class BaseGame(ABC):
         
         # Light up the diagonal
         for pos in squares:
-            sensor = ChessMapper.chess_to_sensor(pos)
+            sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
             if sensor is not None:
                 # Cyan color for diagonals (same as rows)
                 self.leds.set_led(sensor, 0, 255, 255, 0)
@@ -2336,7 +2474,7 @@ class BaseGame(ABC):
                 col = chr(ord('A') + i)
                 row = i + 1
                 pos = f"{col}{row}"
-                sensor = ChessMapper.chess_to_sensor(pos)
+                sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                 if sensor is not None:
                     # Yellow color for diagonals
                     self.leds.set_led(sensor, 0, 255, 255, 255)
@@ -2346,7 +2484,7 @@ class BaseGame(ABC):
                 col = chr(ord('A') + i)
                 row = 8 - i
                 pos = f"{col}{row}"
-                sensor = ChessMapper.chess_to_sensor(pos)
+                sensor = ChessMapper.chess_to_sensor(self._orient_square(pos))
                 if sensor is not None:
                     # Yellow color for diagonals
                     self.leds.set_led(sensor, 0, 255, 255, 255)
@@ -2661,6 +2799,16 @@ class BaseGame(ABC):
         # Show cancelled message
         self.show_temp_message("Setup cancelled", duration=2)
         
+        # Als computer als eerste aan de beurt is, start direct computer move
+        if self._is_computer_turn():
+            self.screen.fill(self.gui.COLOR_BG)
+            self.gui.draw_board()
+            self.gui.draw_pieces()
+            self.gui.draw_debug_overlays()
+            self.gui.draw_sidebar()
+            pygame.display.flip()
+            self.make_computer_move()
+        
         # Force screen update
         self.screen_dirty = True
     
@@ -2693,7 +2841,7 @@ class BaseGame(ABC):
         self.temp_message = None
         
         # Detecteer welke kleur rechts staat en roteer die
-        self._update_rotated_color()
+        self._apply_color_selection()
         
         # Clear LEDs
         self.leds.clear()
@@ -2706,6 +2854,16 @@ class BaseGame(ABC):
         
         # Success message
         self.show_temp_message("Setup complete! Game started.", duration=2)
+        
+        # Als computer als eerste aan de beurt is, start direct computer move
+        if self._is_computer_turn():
+            self.screen.fill(self.gui.COLOR_BG)
+            self.gui.draw_board()
+            self.gui.draw_pieces()
+            self.gui.draw_debug_overlays()
+            self.gui.draw_sidebar()
+            pygame.display.flip()
+            self.make_computer_move()
         
         # Force screen update
         self.screen_dirty = True
