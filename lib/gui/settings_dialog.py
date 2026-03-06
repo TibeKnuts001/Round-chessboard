@@ -69,20 +69,21 @@ class SettingsDialog:
         # Tab list (base tabs + optional custom tabs)
         base_tabs = [
             ('general', 'General', True),
+            ('sound', 'Sound', True),
             ('debug', 'Debug', True)
         ]
         
         if custom_tabs:
-            # Insert custom tabs between general and debug
-            tab_list = [base_tabs[0]] + custom_tabs + [base_tabs[1]]
+            # Insert custom tabs between general and sound
+            tab_list = [base_tabs[0]] + custom_tabs + [base_tabs[1], base_tabs[2]]
         else:
             tab_list = base_tabs
         
         # Draw tabs
         tab_y = dialog_y + 70
-        tab_width = 120
+        tab_width = 100
         tab_height = 40
-        tab_spacing = 10
+        tab_spacing = 6
         
         result = {
             'tabs': {},
@@ -121,6 +122,8 @@ class SettingsDialog:
             custom_renderers[active_tab](dialog_x, content_y, settings, result)
         elif active_tab == 'general':
             self._draw_general_tab(dialog_x, content_y, settings, result)
+        elif active_tab == 'sound':
+            self._draw_sound_tab(dialog_x, content_y, settings, result)
         elif active_tab == 'debug':
             self._draw_debug_tab(dialog_x, content_y, settings, result)
         
@@ -156,6 +159,57 @@ class SettingsDialog:
                 self.screen.blit(item_text, (item_rect.x + 10, item_rect.y + 8))
         
         return result
+    
+    def _draw_sound_tab(self, dialog_x, content_y, settings, result):
+        """Teken sound tab met volume sliders"""
+        y_pos = content_y
+        label_width = 210
+        label_x = dialog_x + 30
+        widget_x = label_x + label_width + 20
+        
+        # Effects Volume slider
+        effects_volume = settings.get('general', {}).get('effects_volume', 80)
+        effects_label = self.font_small.render("Effects Volume", True, UIWidgets.COLOR_BLACK)
+        self.screen.blit(effects_label, (label_x, y_pos + 8))
+        
+        desc = self.font_small.render("Geluid van zetten, schaak, mat", True, (140, 140, 140))
+        self.screen.blit(desc, (label_x, y_pos + 28))
+        
+        effects_slider_rect = UIWidgets.draw_slider(
+            self.screen,
+            widget_x,
+            y_pos,
+            200,
+            effects_volume,
+            0,
+            100,
+            f"{effects_volume}%",
+            self.font_small
+        )
+        result['sliders']['effects_volume'] = effects_slider_rect
+        
+        y_pos += 85
+        
+        # Screensaver Music Volume slider
+        music_volume = settings.get('general', {}).get('music_volume', 80)
+        music_label = self.font_small.render("Screensaver Music Volume", True, UIWidgets.COLOR_BLACK)
+        self.screen.blit(music_label, (label_x, y_pos + 8))
+        
+        desc2 = self.font_small.render("Achtergrondmuziek tijdens screensaver", True, (140, 140, 140))
+        self.screen.blit(desc2, (label_x, y_pos + 28))
+        
+        music_slider_rect = UIWidgets.draw_slider(
+            self.screen,
+            widget_x,
+            y_pos,
+            200,
+            music_volume,
+            0,
+            100,
+            f"{music_volume}%",
+            self.font_small
+        )
+        result['sliders']['music_volume'] = music_slider_rect
     
     def _draw_general_tab(self, dialog_x, content_y, settings, result):
         """Teken general tab (hardware settings - shared)"""

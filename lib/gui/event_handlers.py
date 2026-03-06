@@ -216,6 +216,8 @@ class EventHandlers:
             'depth': ('stockfish_depth', 5, 50),
             'ai_difficulty': ('ai_difficulty', 1, 10),
             'ai_think_time': ('ai_think_time', 500, 5000),
+            'effects_volume': ('effects_volume', 0, 100),
+            'music_volume': ('music_volume', 0, 100),
         }
         
         slider_type = self.gui.dragging_slider
@@ -427,6 +429,28 @@ class EventHandlers:
     def handle_ai_think_time_slider_drag(self, pos, slider_rect):
         """Handle checkers AI think time slider drag"""
         return self._handle_slider_drag(pos, slider_rect, 'ai_think_time', 'ai_think_time', 500, 5000)
+    
+    def handle_effects_volume_slider_click(self, pos, slider_rect):
+        """Handle effects volume slider click to start dragging"""
+        if self._handle_slider_click(pos, slider_rect, 'effects_volume'):
+            self._handle_slider_drag(pos, slider_rect, 'effects_volume', 'effects_volume', 0, 100)
+            return True
+        return False
+    
+    def handle_effects_volume_slider_drag(self, pos, slider_rect):
+        """Handle effects volume slider drag"""
+        return self._handle_slider_drag(pos, slider_rect, 'effects_volume', 'effects_volume', 0, 100)
+    
+    def handle_music_volume_slider_click(self, pos, slider_rect):
+        """Handle screensaver music volume slider click to start dragging"""
+        if self._handle_slider_click(pos, slider_rect, 'music_volume'):
+            self._handle_slider_drag(pos, slider_rect, 'music_volume', 'music_volume', 0, 100)
+            return True
+        return False
+    
+    def handle_music_volume_slider_drag(self, pos, slider_rect):
+        """Handle screensaver music volume slider drag"""
+        return self._handle_slider_drag(pos, slider_rect, 'music_volume', 'music_volume', 0, 100)
     
     # Dropdown handlers
     

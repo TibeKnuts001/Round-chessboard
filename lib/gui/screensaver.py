@@ -161,6 +161,12 @@ class Screensaver:
             
             pygame.mixer.music.load(selected_audio)
             pygame.mixer.music.play()  # Play once (not looping)
+            # Apply music volume from settings
+            try:
+                music_volume = self.settings.get('music_volume', 80, section='general') / 100
+                pygame.mixer.music.set_volume(music_volume)
+            except Exception:
+                pass
             return True
         except Exception as e:
             print(f"✗ Kon screensaver audio niet laden: {e}")

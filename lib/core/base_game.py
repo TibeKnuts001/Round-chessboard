@@ -76,6 +76,8 @@ class BaseGame(ABC):
         self.previous_mismatch_positions = []  # Track voor clearing LEDs
         self.game_paused = False  # Pause bij board mismatch
         self.previous_brightness = brightness
+        self.previous_effects_volume = -1
+        self.previous_music_volume = -1
         self.temp_message = None  # Tijdelijke berichten
         self.temp_message_timer = 0  # Wanneer bericht verdwijnt
         self.last_blink_state = None  # Track LED blink state om onnodige updates te voorkomen
@@ -777,6 +779,22 @@ class BaseGame(ABC):
                     self.leds.set_brightness(current_brightness)
                     self.previous_brightness = current_brightness
                     print(f"Brightness aangepast naar {current_brightness}%")
+                
+                # Update effects volume indien gewijzigd
+                current_effects_volume = self.gui.settings.get('effects_volume', 80, section='general')
+                if current_effects_volume != self.previous_effects_volume:
+                    self.sound_manager.set_volume(current_effects_volume / 100)
+                    self.previous_effects_volume = current_effects_volume
+                
+                # Update screensaver music volume indien gewijzigd
+                current_music_volume = self.gui.settings.get('music_volume', 80, section='general')
+                if current_music_volume != self.previous_music_volume:
+                    try:
+                        import pygame as _pygame
+                        _pygame.mixer.music.set_volume(current_music_volume / 100)
+                    except Exception:
+                        pass
+                    self.previous_music_volume = current_music_volume
                 
                 # Update AI status indien gewijzigd (game-specifiek)
                 self._update_ai_status()
@@ -1640,6 +1658,11 @@ class BaseGame(ABC):
         if self.gui.events.handle_ai_difficulty_slider_click(pos, sliders.get('ai_difficulty')):
             return
         if self.gui.events.handle_ai_think_time_slider_click(pos, sliders.get('ai_think_time')):
+            return
+        # Sound sliders
+        if self.gui.events.handle_effects_volume_slider_click(pos, sliders.get('effects_volume')):
+            return
+        if self.gui.events.handle_music_volume_slider_click(pos, sliders.get('music_volume')):
             return
         
         # OK button

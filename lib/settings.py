@@ -60,6 +60,8 @@ class Settings:
         'general': {
             'screensaver_audio': True,  # Muziek tijdens screensaver
             'sound_effects': True,  # Game sound effects (check, checkmate, mismatch)
+            'effects_volume': 80,  # Volume van game sound effects (0-100)
+            'music_volume': 80,    # Volume van screensaver muziek (0-100)
         },
         'debug': {
             'debug_sensors': False,
@@ -89,6 +91,8 @@ class Settings:
         'power_profile': 'hardware',
         # General
         'screensaver_audio': 'general',
+        'effects_volume': 'general',
+        'music_volume': 'general',
         # Debug
         'debug_sensors': 'debug',
         'validate_board_state': 'debug',
