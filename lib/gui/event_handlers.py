@@ -193,7 +193,25 @@ class EventHandlers:
             return True
         return False
     
-    # Slider handlers
+    def handle_hide_board_display_toggle_click(self, pos, toggle_rect):
+        """Handle klik op hide board display toggle (chess)"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'hide_board_display', False, section='chess')
+            Settings.set_in_dict(self.gui.temp_settings, 'hide_board_display', not current_value, section='chess')
+            return True
+        return False
+    
+    def handle_hide_board_display_checkers_toggle_click(self, pos, toggle_rect):
+        """Handle klik op hide board display toggle (checkers)"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'hide_board_display', False, section='checkers')
+            Settings.set_in_dict(self.gui.temp_settings, 'hide_board_display', not current_value, section='checkers')
+            return True
+        return False
     
     def handle_slider_drag(self, pos, sliders_dict):
         """Handle drag for any active slider

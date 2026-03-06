@@ -230,6 +230,13 @@ class CheckersGUI:
         # Blit cached board naar board_surface
         self.board_surface.blit(self.cached_board, (0, 0))
         
+        # Verberg board: geen highlights, donkere overlay
+        if self.settings.get('hide_board_display', False, section='checkers'):
+            dark_overlay = pygame.Surface((self.board_size, self.board_size), pygame.SRCALPHA)
+            dark_overlay.fill((0, 0, 0, 120))
+            self.board_surface.blit(dark_overlay, (0, 0))
+            return
+        
         # Teken highlights en last move bovenop
         if isinstance(self.highlighted_squares, dict):
             highlights = self.highlighted_squares.copy()
@@ -254,6 +261,10 @@ class CheckersGUI:
     
     def draw_pieces(self):
         """Teken checkers pieces - gebruik cache"""
+        # Skip als board verborgen is
+        if self.settings.get('hide_board_display', False, section='checkers'):
+            return
+        
         # Converteer engine board naar format voor BoardRenderer
         board_state = {}
         for row in range(8):

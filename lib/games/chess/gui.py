@@ -227,6 +227,13 @@ class ChessGUI:
         # Blit cached board naar board_surface
         self.board_surface.blit(self.cached_board, (0, 0))
         
+        # Verberg board: geen highlights, donkere overlay
+        if self.settings.get('hide_board_display', False, section='chess'):
+            dark_overlay = pygame.Surface((self.board_size, self.board_size), pygame.SRCALPHA)
+            dark_overlay.fill((0, 0, 0, 120))
+            self.board_surface.blit(dark_overlay, (0, 0))
+            return
+        
         # Teken highlights bovenop board_surface (alleen als nodig)
         if self.highlighted_squares or self.selected_piece_from or self.capture_squares or self.tutorial_squares:
             temp_screen = self.board_renderer.screen
@@ -236,6 +243,10 @@ class ChessGUI:
     
     def draw_pieces(self):
         """Teken schaakstukken op board_surface - gebruik cache"""
+        # Skip als board verborgen is
+        if self.settings.get('hide_board_display', False, section='chess'):
+            return
+        
         current_board = self.engine.get_board()
         current_fen = current_board.fen()
         

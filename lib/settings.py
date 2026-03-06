@@ -70,6 +70,7 @@ class Settings:
         'chess': {
             'play_vs_computer': False,
             'strict_touch_move': False,  # Touch-move regel
+            'hide_board_display': False,  # Verberg bord op scherm (geen stukken, geen highlights)
             'use_worstfish': False,  # Gebruik zwakke AI in plaats van Stockfish
             'stockfish_skill_level': 10,  # 0-20 (0=zwakst, 20=sterkst)
             'stockfish_think_time': 1000,  # Denktijd in ms (500-10000)
@@ -79,6 +80,7 @@ class Settings:
         'checkers': {
             'play_vs_computer': False,
             'strict_touch_move': False,  # Touch-move regel
+            'hide_board_display': False,  # Verberg bord op scherm (geen stukken, geen highlights)
             'cake_difficulty': 5,  # 1-10 (1=zwakst, 10=sterkst)
             'cake_think_time': 1000,  # Denktijd in ms (500-5000)
         }

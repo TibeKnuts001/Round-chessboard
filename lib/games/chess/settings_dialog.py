@@ -53,6 +53,26 @@ class ChessSettingsTabs:
         y_pos += 60
         info_text = font_small.render("Strict = must move touched piece", True, (100, 100, 100))
         screen.blit(info_text, (dialog_x + 50, y_pos))
+        
+        y_pos += 60
+        
+        # Hide Board Display toggle
+        hide_board_toggle = UIWidgets.draw_toggle(
+            screen,
+            toggle_x,
+            y_pos,
+            settings.get('chess', {}).get('hide_board_display', False),
+            font_small
+        )
+        
+        label = font_small.render("Hide Board Display", True, UIWidgets.COLOR_BLACK)
+        screen.blit(label, (hide_board_toggle.right + 15, y_pos + 8))
+        
+        result['toggles']['hide_board_display'] = hide_board_toggle
+        
+        y_pos += 40
+        info_text2 = font_small.render("Hides pieces and highlights on screen", True, (100, 100, 100))
+        screen.blit(info_text2, (dialog_x + 50, y_pos))
     
     @staticmethod
     def render_ai_tab(screen, font_small, dialog_x, content_y, settings, result):

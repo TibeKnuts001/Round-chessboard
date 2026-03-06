@@ -1626,6 +1626,10 @@ class BaseGame(ABC):
             return
         if self.gui.events.handle_strict_touch_move_checkers_toggle_click(pos, toggles.get('strict_touch_move_checkers')):
             return
+        if self.gui.events.handle_hide_board_display_toggle_click(pos, toggles.get('hide_board_display')):
+            return
+        if self.gui.events.handle_hide_board_display_checkers_toggle_click(pos, toggles.get('hide_board_display_checkers')):
+            return
         
         # Screensaver button (debug tab)
         if screensaver_button:
