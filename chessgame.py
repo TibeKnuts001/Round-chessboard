@@ -31,6 +31,10 @@ class ChessGame(BaseGame):
     def _is_strict_touch_move_enabled(self):
         """Check of strict touch-move aan staat voor chess"""
         return self.gui.settings.get('strict_touch_move', False, section='chess')
+
+    def _supports_castling(self):
+        """Chess ondersteunt castling."""
+        return True
     
     def _get_setup_steps(self):
         """Chess-specifieke setup steps - wit en zwart gelijktijdig per piece type"""

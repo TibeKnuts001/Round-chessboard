@@ -184,6 +184,10 @@ class BaseGame(ABC):
         """
         return False
 
+    def _supports_castling(self):
+        """Return True als dit spel castling ondersteunt (alleen chess)."""
+        return False
+
     @staticmethod
     def _flip_square(square):
         """Flip square 180°: A1↔H8, B2↔G7, etc.
@@ -686,7 +690,7 @@ class BaseGame(ABC):
                     return
                 
                 # Check if this is a castling move (intermediate contains rook positions)
-                if move_success and move_intermediate and len(move_intermediate) == 2:
+                if move_success and move_intermediate and len(move_intermediate) == 2 and self._supports_castling():
                     # This is castling - set castling_pending to track rook movement
                     rook_from, rook_to = move_intermediate
                     self.castling_pending = {
