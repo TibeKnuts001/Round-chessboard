@@ -135,13 +135,22 @@ class CheckersGame(BaseGame):
                 to_pos = self.engine.CHECKERS_TO_CHESS.get(to_checkers)
                 
                 # Get intermediate squares for multi-captures
+                # Gebruik square_list (0-indexed, +1 offset) net zoals engine.get_legal_moves_from doet
                 intermediate = []
-                if len(squares) > 2:
+                if hasattr(best_move, 'square_list') and len(best_move.square_list) > 2:
+                    for sq in best_move.square_list[1:-1]:  # Skip from en to
+                        sq_chess = self.engine.CHECKERS_TO_CHESS.get(sq + 1)  # +1: square_list is 0-indexed
+                        if sq_chess and sq_chess not in intermediate:
+                            intermediate.append(sq_chess)
+                    print(f"  Multi-capture intermediates (square_list): {intermediate}")
+                elif len(squares) > 2:
+                    # Fallback: parse move string (werkt alleen als string tussenposities bevat)
                     for sq_str in squares[1:-1]:
                         sq_num = int(sq_str)
                         sq_chess = self.engine.CHECKERS_TO_CHESS.get(sq_num)
-                        if sq_chess:
+                        if sq_chess and sq_chess not in intermediate:
                             intermediate.append(sq_chess)
+                    print(f"  Multi-capture intermediates (string fallback): {intermediate}")
                 
                 self.engine.board.push(best_move)
                 self.engine.move_count += 1  # Track move count
