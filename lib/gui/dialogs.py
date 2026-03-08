@@ -282,22 +282,21 @@ class DialogRenderer:
         
         return yes_button, no_button, cancel_button
     
-    def draw_color_selection_dialog(self, vs_computer=False, white_on_left=True, computer_plays='black'):
+    def draw_color_selection_dialog(self, white_on_left=True, computer_plays=None):
         """
         Teken color/side selection dialog voor start van nieuw spel.
         
         Args:
-            vs_computer: Of AI ook een kant kiest
             white_on_left: True = wit links, False = zwart links
-            computer_plays: 'white' of 'black'
+            computer_plays: 'white', 'black' of None (AI uit)
         
         Returns:
             Tuple: (swap_button, confirm_button, cancel_button,
-                    computer_white_button, computer_black_button)
+                    computer_black_button, computer_off_button, computer_white_button)
         """
         self._draw_overlay()
         
-        dialog_height = 360 if vs_computer else 300
+        dialog_height = 390
         dialog_width = 520
         dialog_x = (self.screen_width - dialog_width) // 2
         dialog_y = (self.screen_height - dialog_height) // 2
@@ -379,40 +378,53 @@ class DialogRenderer:
             swap_label = self.font_small.render("< >", True, (255, 255, 255))
             self.screen.blit(swap_label, swap_label.get_rect(center=swap_button.center))
         
-        # --- AI section (if vs computer) ---
-        computer_white_button = None
-        computer_black_button = None
+        # --- AI 3-positie schakelaar (altijd zichtbaar) ---
+        ai_section_y = panel_y + panel_h + 42
+        ai_label = self.font_small.render("AI Tegenstander:", True, self.COLOR_BLACK)
+        self.screen.blit(ai_label, ai_label.get_rect(center=(self.screen_width // 2, ai_section_y)))
         
-        if vs_computer:
-            ai_y = panel_y + panel_h + 40
-            ai_label = self.font_small.render("Computer:", True, self.COLOR_BLACK)
-            self.screen.blit(ai_label, (dialog_x + 40, ai_y))
-            
-            btn_w = 100
-            btn_h = 38
-            btn_gap = 14
-            btn_start_x = self.screen_width // 2 - btn_w - btn_gap // 2
-            
-            computer_white_button = pygame.Rect(btn_start_x, ai_y - 5, btn_w, btn_h)
-            computer_black_button = pygame.Rect(btn_start_x + btn_w + btn_gap, ai_y - 5, btn_w, btn_h)
-            
-            # White button
-            w_active = computer_plays == 'white'
-            w_bg = (50, 150, 50) if w_active else ((80, 80, 80) if computer_white_button.collidepoint(mouse_pos) else (60, 60, 60))
-            pygame.draw.rect(self.screen, w_bg, computer_white_button, border_radius=8)
-            if w_active:
-                pygame.draw.rect(self.screen, (100, 255, 100), computer_white_button, 2, border_radius=8)
-            w_text = self.font_small.render("Wit", True, (255, 255, 255))
-            self.screen.blit(w_text, w_text.get_rect(center=computer_white_button.center))
-            
-            # Black button
-            b_active = computer_plays == 'black'
-            b_bg = (50, 150, 50) if b_active else ((80, 80, 80) if computer_black_button.collidepoint(mouse_pos) else (60, 60, 60))
-            pygame.draw.rect(self.screen, b_bg, computer_black_button, border_radius=8)
-            if b_active:
-                pygame.draw.rect(self.screen, (100, 255, 100), computer_black_button, 2, border_radius=8)
-            b_text = self.font_small.render("Zwart", True, (255, 255, 255))
-            self.screen.blit(b_text, b_text.get_rect(center=computer_black_button.center))
+        toggle_w = 360
+        toggle_h = 46
+        toggle_x = (self.screen_width - toggle_w) // 2
+        toggle_y = ai_section_y + 26
+        seg_w = toggle_w // 3
+        
+        # Track achtergrond
+        track_rect = pygame.Rect(toggle_x, toggle_y, toggle_w, toggle_h)
+        pygame.draw.rect(self.screen, (210, 210, 210), track_rect, border_radius=23)
+        
+        # 3 klikbare segmenten: Wit | Uit | Zwart (zelfde volgorde als kleurpanelen boven)
+        computer_white_button = pygame.Rect(toggle_x,              toggle_y, seg_w,                toggle_h)
+        computer_off_button   = pygame.Rect(toggle_x + seg_w,      toggle_y, seg_w,                toggle_h)
+        computer_black_button = pygame.Rect(toggle_x + seg_w * 2,  toggle_y, toggle_w - seg_w * 2, toggle_h)
+        
+        # Actief segment en kleuren
+        if computer_plays == 'white':
+            active_btn   = computer_white_button
+            pill_color   = (200, 200, 200)
+            label_colors = [(30, 30, 30), (80, 80, 80), (80, 80, 80)]
+        elif computer_plays == 'black':
+            active_btn   = computer_black_button
+            pill_color   = (40, 40, 40)
+            label_colors = [(80, 80, 80), (80, 80, 80), (255, 255, 255)]
+        else:  # None = Uit
+            active_btn   = computer_off_button
+            pill_color   = (110, 110, 110)
+            label_colors = [(80, 80, 80), (255, 255, 255), (80, 80, 80)]
+        
+        # Teken actieve pill (iets kleiner dan segment)
+        pill_rect = pygame.Rect(active_btn.x + 3, active_btn.y + 3,
+                                active_btn.width - 6, active_btn.height - 6)
+        pygame.draw.rect(self.screen, pill_color, pill_rect, border_radius=20)
+        
+        # Labels
+        for btn, lbl, txt_col in zip(
+            [computer_white_button, computer_off_button, computer_black_button],
+            ["Wit", "Uit", "Zwart"],
+            label_colors
+        ):
+            txt = self.font_small.render(lbl, True, txt_col)
+            self.screen.blit(txt, txt.get_rect(center=btn.center))
         
         # --- Confirm / Cancel buttons ---
         confirm_button = pygame.Rect(
@@ -439,7 +451,7 @@ class DialogRenderer:
         self.screen.blit(cancel_text, cancel_text.get_rect(center=cancel_button.center))
         
         return (swap_button, confirm_button, cancel_button,
-                computer_white_button, computer_black_button)
+                computer_black_button, computer_off_button, computer_white_button)
     
     def draw_stop_game_confirm_dialog(self):
         """

@@ -155,7 +155,16 @@ class BaseGame(ABC):
         white_on_left=False → wit rechts → wit stukken geroteerd
         """
         white_on_left = getattr(self.gui, 'color_selection_white_on_left', True)
-        self.computer_color = getattr(self.gui, 'color_selection_computer_plays', 'black')
+        computer_plays = getattr(self.gui, 'color_selection_computer_plays', None)
+        
+        # Pas play_vs_computer setting aan op basis van AI toggle
+        section = 'checkers' if 'Checkers' in self.__class__.__name__ else 'chess'
+        if computer_plays is None:
+            self.computer_color = 'black'  # fallback, wordt niet gebruikt
+            self.gui.settings.set('play_vs_computer', False, section=section)
+        else:
+            self.computer_color = computer_plays
+            self.gui.settings.set('play_vs_computer', True, section=section)
         
         if hasattr(self.gui, 'board_renderer'):
             # Zwarte stukken staan altijd 'boven' op het bord (ranks 6-8)
@@ -1539,18 +1548,22 @@ class BaseGame(ABC):
             swap_btn = gui_result.get('color_sel_swap')
             confirm_btn = gui_result.get('color_sel_confirm')
             cancel_btn = gui_result.get('color_sel_cancel')
-            comp_white_btn = gui_result.get('color_sel_comp_white')
             comp_black_btn = gui_result.get('color_sel_comp_black')
+            comp_off_btn  = gui_result.get('color_sel_comp_off')
+            comp_white_btn = gui_result.get('color_sel_comp_white')
             
             if swap_btn and swap_btn.collidepoint(pos):
                 self.gui.color_selection_white_on_left = not self.gui.color_selection_white_on_left
                 self._set_color_selection_leds()
                 self.screen_dirty = True
-            elif comp_white_btn and comp_white_btn.collidepoint(pos):
-                self.gui.color_selection_computer_plays = 'white'
-                self.screen_dirty = True
             elif comp_black_btn and comp_black_btn.collidepoint(pos):
                 self.gui.color_selection_computer_plays = 'black'
+                self.screen_dirty = True
+            elif comp_off_btn and comp_off_btn.collidepoint(pos):
+                self.gui.color_selection_computer_plays = None
+                self.screen_dirty = True
+            elif comp_white_btn and comp_white_btn.collidepoint(pos):
+                self.gui.color_selection_computer_plays = 'white'
                 self.screen_dirty = True
             elif confirm_btn and confirm_btn.collidepoint(pos):
                 self.gui.show_color_selection = False

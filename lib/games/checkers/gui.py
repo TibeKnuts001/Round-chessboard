@@ -135,7 +135,9 @@ class CheckersGUI:
         self.show_update_status_dialog = False  # Voor update status dialog
         self.show_color_selection = False  # Voor kleur/kant selectie voor nieuw spel
         self.color_selection_white_on_left = True  # True = wit links, False = zwart links
-        self.color_selection_computer_plays = 'black'  # 'white' of 'black'
+        # None = AI uit, 'white'/'black' = AI speelt die kleur
+        vs_comp = self.settings.get('play_vs_computer', False, section='checkers')
+        self.color_selection_computer_plays = 'black' if vs_comp else None
         self.update_info = {}  # Update status information
         self.assisted_setup_mode = False
         self.assisted_setup_step = 0
@@ -395,18 +397,18 @@ class CheckersGUI:
             result['stop_game_yes'] = stop_game_yes_button
             result['stop_game_no'] = stop_game_no_button
         elif self.show_color_selection:
-            vs_computer = self.settings.get('play_vs_computer', False, section='checkers')
             (color_sel_swap_button, color_sel_confirm_button, color_sel_cancel_button,
-             color_sel_comp_white_button, color_sel_comp_black_button) = self.dialog_renderer.draw_color_selection_dialog(
-                vs_computer=vs_computer,
+             color_sel_comp_black_button, color_sel_comp_off_button,
+             color_sel_comp_white_button) = self.dialog_renderer.draw_color_selection_dialog(
                 white_on_left=self.color_selection_white_on_left,
                 computer_plays=self.color_selection_computer_plays
             )
             result['color_sel_swap'] = color_sel_swap_button
             result['color_sel_confirm'] = color_sel_confirm_button
             result['color_sel_cancel'] = color_sel_cancel_button
-            result['color_sel_comp_white'] = color_sel_comp_white_button
             result['color_sel_comp_black'] = color_sel_comp_black_button
+            result['color_sel_comp_off'] = color_sel_comp_off_button
+            result['color_sel_comp_white'] = color_sel_comp_white_button
         elif self.show_new_game_confirm:
             new_game_normal_button, new_game_assisted_button, new_game_cancel_button = self.dialog_renderer.draw_new_game_confirm_dialog()
             result['new_game_normal'] = new_game_normal_button
