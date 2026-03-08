@@ -158,14 +158,13 @@ class BaseGame(ABC):
         self.computer_color = getattr(self.gui, 'color_selection_computer_plays', 'black')
         
         if hasattr(self.gui, 'board_renderer'):
-            # Chess renderer gebruikt bool (piece.color is True/False)
-            # Checkers renderer gebruikt string ('white'/'black')
+            # Zwarte stukken staan altijd 'boven' op het bord (ranks 6-8)
+            # en komen na CW én CCW rotatie altijd op de kant te staan die 180° rotatie nodig heeft.
+            # Wit ertegenover staat dan automatisch ook correct.
             if 'Checkers' in self.__class__.__name__:
-                # white_on_left → black on right → black rotated
-                self.gui.board_renderer.rotated_color = 'black' if white_on_left else 'white'
+                self.gui.board_renderer.rotated_color = 'black'
             else:
-                # white_on_left=True → not True = False = black rotated
-                self.gui.board_renderer.rotated_color = not white_on_left
+                self.gui.board_renderer.rotated_color = False  # False = zwart in python-chess
         
         # Force cache refresh
         self.gui.cached_pieces = None
@@ -1926,6 +1925,9 @@ class BaseGame(ABC):
                 # Toon color selectie
                 self.gui.show_color_selection = True
                 self._set_color_selection_leds()
+                # Reset rotated_color naar correcte beginstand zodat stukken
+                # al juist staan in de kleur-selectie dialog
+                self._apply_color_selection()
             return
         
         # Undo button - alleen actief als spel gestart is
