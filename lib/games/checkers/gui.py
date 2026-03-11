@@ -150,6 +150,8 @@ class CheckersGUI:
         self.selected_piece = None
         self.selected_piece_from = None
         self.active_settings_tab = 'general'
+        self.debug_unlocked = False  # Debug tab hidden by default; unlocked by secret gesture
+        self.settings_title_clicks = []  # Timestamps of clicks on 'Settings' title (4 = unlock)
         self.active_sensor_states = {}
         self.dragging_slider = False  # Voor brightness slider drag
         self.dragging_stockfish_slider = False  # Voor AI skill slider (toekomstig gebruik)
@@ -364,6 +366,7 @@ class CheckersGUI:
         Returns:
             Dict met UI components voor event handling
         """
+        self.game_started = game_started  # Beschikbaar voor settings dialog
         self.screen.fill(self.COLOR_BG)
         
         # Teken bord op board_surface

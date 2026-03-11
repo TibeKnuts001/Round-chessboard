@@ -162,6 +162,8 @@ class ChessGUI:
         self.selected_piece = None  # Opgepakte stuk (chess.Piece object)
         self.selected_piece_from = None  # Van welk veld opgepakt (bijv "E2")
         self.active_settings_tab = 'general'  # Active tab in settings ('general' of 'debug')
+        self.debug_unlocked = False  # Debug tab hidden by default; unlocked by secret gesture
+        self.settings_title_clicks = []  # Timestamps of clicks on 'Settings' title (4 = unlock)
         self.active_sensor_states = {}  # Voor debug visualisatie
         
         # Renderers voor verschillende GUI componenten
@@ -507,6 +509,7 @@ class ChessGUI:
     
     def draw(self, temp_message=None, temp_message_timer=0, game_started=False):
         """Teken complete GUI"""
+        self.game_started = game_started  # Beschikbaar voor settings dialog
         # Clear screen
         self.screen.fill(self.COLOR_BG)
         
@@ -549,9 +552,10 @@ class ChessGUI:
         power_profiles = []
         screensaver_button = None
         assisted_setup_button = None
-        test_position_button = None
         tutorial_button = None
         check_updates_button = None
+        title_rect = None
+        close_dev_button = None
         if self.show_settings:
             settings_result = self.draw_settings_dialog()
             ok_button = settings_result['ok_button']
@@ -563,9 +567,10 @@ class ChessGUI:
             power_profiles = settings_result.get('power_profiles', [])
             screensaver_button = settings_result.get('screensaver_button')
             assisted_setup_button = settings_result.get('assisted_setup_button')
-            test_position_button = settings_result.get('test_position_button')
             tutorial_button = settings_result.get('tutorial_button')
             check_updates_button = settings_result.get('check_updates_button')
+            title_rect = settings_result.get('title_rect')
+            close_dev_button = settings_result.get('close_dev_button')
             # Extract individual values for backwards compatibility
             toggle_rect = toggles.get('coordinates')
             debug_toggle_rect = toggles.get('debug_sensors')
@@ -662,9 +667,10 @@ class ChessGUI:
             'power_profiles': power_profiles if self.show_settings else [],
             'screensaver_button': screensaver_button,
             'assisted_setup_button': assisted_setup_button,
-            'test_position_button': test_position_button,
             'tutorial_button': tutorial_button,
             'check_updates_button': check_updates_button,
+            'title_rect': title_rect,
+            'close_dev_button': close_dev_button,
             'undo_button': self.undo_button,
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,

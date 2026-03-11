@@ -290,23 +290,6 @@ class BaseGame(ABC):
         # Default implementatie - subclass kan overschrijven voor game-specifieke sectie
         return self.gui.settings.get('play_vs_computer', False)
     
-    def _load_test_position(self):
-        """
-        Load test FEN position (chess only)
-        
-        FEN: 8/2p5/1p1p1k2/p2Pp3/P1P1Pp2/5P2/5K2/8 w - - 0 1
-        """
-        # Check if this is a chess game with a board that supports FEN
-        if hasattr(self.engine, 'board') and hasattr(self.engine.board, 'set_fen'):
-            try:
-                test_fen = "8/2p5/1p1p1k2/p2Pp3/P1P1Pp2/5P2/5K2/8 w - - 0 1"
-                self.engine.board.set_fen(test_fen)
-                print(f"Loaded test position: {test_fen}")
-                self.game_started = True
-                self.last_activity_time = time.time()
-            except Exception as e:
-                print(f"Error loading test position: {e}")
-    
     def read_sensors(self):
         """
         Lees sensor state en converteer naar dict met posities
@@ -963,7 +946,7 @@ class BaseGame(ABC):
                     not self.ai_move_pending and
                     not self.castling_pending and
                     not self.gui.assisted_setup_mode and
-                    self.gui.settings.get('validate_board_state', False, section='debug')):
+                    self.gui.settings.get('validate_board_state', True, section='debug')):
                     old_paused_state = self.game_paused
                     self.board_mismatch_positions = self.validate_board_state(current_sensors)
                     if self.board_mismatch_positions:
@@ -1697,9 +1680,20 @@ class BaseGame(ABC):
         ok_button = gui_result.get('ok_button')
         screensaver_button = gui_result.get('screensaver_button')
         assisted_setup_button = gui_result.get('assisted_setup_button')
-        test_position_button = gui_result.get('test_position_button')
         tutorial_button = gui_result.get('tutorial_button')
         check_updates_button = gui_result.get('check_updates_button')
+        close_dev_button = gui_result.get('close_dev_button')
+        title_rect = gui_result.get('title_rect')
+        
+        # Secret gesture: 4 clicks on 'Settings' title unlocks dev tab
+        if self.gui.events.handle_settings_title_click(pos, title_rect):
+            return
+        
+        # Close Dev button: hides the dev tab
+        if close_dev_button and close_dev_button.collidepoint(pos):
+            self.gui.debug_unlocked = False
+            self.gui.active_settings_tab = 'general'
+            return
         
         # Check updates button
         if check_updates_button and check_updates_button.collidepoint(pos):
@@ -1707,13 +1701,6 @@ class BaseGame(ABC):
             self.gui.show_settings = False
             self.gui.temp_settings = {}
             self._check_for_updates()
-            return
-        
-        # Check test position button (chess only)
-        if test_position_button and test_position_button.collidepoint(pos):
-            self._load_test_position()
-            self.gui.show_settings = False
-            self.gui.temp_settings = {}
             return
         
         # Check tutorial button

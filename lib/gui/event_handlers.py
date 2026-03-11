@@ -38,6 +38,7 @@ Wordt gebruikt door: ChessGUI (via self.events delegation)
 """
 
 import pygame
+import time
 from lib.settings import Settings
 
 
@@ -61,6 +62,22 @@ class EventHandlers:
             self.gui.temp_settings = self.gui.settings.get_temp_copy()
             return True
         return False
+    
+    def handle_settings_title_click(self, pos, title_rect):
+        """Secret gesture: klik 4x op 'Settings' titel om debug tab te unlocken"""
+        if title_rect is None or not title_rect.collidepoint(pos):
+            return False
+        now = time.time()
+        # Houd alleen klikken bij die binnen 3 seconden van elkaar zijn
+        self.gui.settings_title_clicks = [
+            t for t in self.gui.settings_title_clicks if now - t < 3.0
+        ]
+        self.gui.settings_title_clicks.append(now)
+        if len(self.gui.settings_title_clicks) >= 4:
+            self.gui.debug_unlocked = True
+            self.gui.settings_title_clicks = []
+            self.gui.active_settings_tab = 'debug'
+        return True
     
     def handle_ok_click(self, pos, ok_button):
         """Handle klik op OK button in settings"""
@@ -326,7 +343,7 @@ class EventHandlers:
             return False
         
         if toggle_rect.collidepoint(pos):
-            current_value = Settings.get_from_dict(self.gui.temp_settings, 'validate_board_state', False)
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'validate_board_state', True)
             Settings.set_in_dict(self.gui.temp_settings, 'validate_board_state', not current_value)
             print(f"Validate board state toggled: {not current_value}")
             return True

@@ -67,15 +67,19 @@ class SettingsDialog:
         self.screen.blit(title, title_rect)
         
         # Tab list (base tabs + optional custom tabs)
+        debug_unlocked = self.gui and getattr(self.gui, 'debug_unlocked', False)
         base_tabs = [
             ('general', 'General', True),
             ('sound', 'Sound', True),
-            ('debug', 'Debug', True)
         ]
+        if debug_unlocked:
+            base_tabs.append(('debug', 'Debug', True))
         
         if custom_tabs:
-            # Insert custom tabs between general and sound
-            tab_list = [base_tabs[0]] + custom_tabs + [base_tabs[1], base_tabs[2]]
+            # Insert custom tabs between general and sound, keep debug at end if unlocked
+            tab_list = [base_tabs[0]] + custom_tabs + [base_tabs[1]]
+            if debug_unlocked:
+                tab_list.append(base_tabs[2])
         else:
             tab_list = base_tabs
         
@@ -90,10 +94,11 @@ class SettingsDialog:
             'sliders': {},
             'toggles': {},
             'dropdowns': {},
+            'title_rect': title_rect,  # Voor secret debug unlock gesture
             'screensaver_button': None,  # Default None, wordt gezet in debug tab
-            'assisted_setup_button': None,  # Default None, wordt gezet in debug tab
+            'assisted_setup_button': None,  # Default None, wordt gezet in general tab
             'tutorial_button': None,  # Default None, wordt gezet in general tab
-            'check_updates_button': None  # Default None, wordt gezet in general tab
+            'check_updates_button': None  # Default None, wordt gezet in debug tab
         }
         
         start_x = dialog_x + (dialog_width - (len(tab_list) * (tab_width + tab_spacing) - tab_spacing)) // 2
@@ -314,15 +319,18 @@ class SettingsDialog:
         )
         result['tutorial_button'] = tutorial_button
         
-        # Check for Updates button (right, next to tutorial)
-        check_updates_button_rect = pygame.Rect(label_x + 270, y_pos, 250, 45)
-        check_updates_button = UIWidgets.draw_button(
+        # Assisted Setup button (right, next to tutorial) - disabled when no game started
+        game_started = self.gui and getattr(self.gui, 'game_started', False)
+        assisted_setup_button_rect = pygame.Rect(label_x + 270, y_pos, 250, 45)
+        assisted_setup_button = UIWidgets.draw_button(
             self.screen,
-            check_updates_button_rect,
-            "Check for Updates",
-            self.font_small
+            assisted_setup_button_rect,
+            "Assisted Setup",
+            self.font_small,
+            is_primary=False,
+            disabled=not game_started
         )
-        result['check_updates_button'] = check_updates_button
+        result['assisted_setup_button'] = assisted_setup_button if game_started else None
     
     def _draw_debug_tab(self, dialog_x, content_y, settings, result):
         """Teken debug tab (debug settings - shared)"""
@@ -350,7 +358,7 @@ class SettingsDialog:
             self.screen,
             toggle_x,
             y_pos,
-            settings.get('debug', {}).get('validate_board_state', False),
+            settings.get('debug', {}).get('validate_board_state', True),
             self.font_small
         )
         
@@ -361,12 +369,15 @@ class SettingsDialog:
         
         y_pos += 65
         
-        # Start Screensaver button
-        button_width = 250
+        # Start Screensaver + Check for Updates side by side
+        button_width = 185
         button_height = 45
-        button_x = dialog_x + (500 - button_width) // 2  # Center in dialog
+        button_spacing = 20
+        total_width = button_width * 2 + button_spacing
+        left_x = dialog_x + (500 - total_width) // 2
+        right_x = left_x + button_width + button_spacing
         
-        screensaver_button_rect = pygame.Rect(button_x, y_pos, button_width, button_height)
+        screensaver_button_rect = pygame.Rect(left_x, y_pos, button_width, button_height)
         screensaver_button = UIWidgets.draw_button(
             self.screen,
             screensaver_button_rect,
@@ -374,46 +385,29 @@ class SettingsDialog:
             self.font_small,
             is_primary=True
         )
-        
         result['screensaver_button'] = screensaver_button
         
-        y_pos += 60
-        
-        # Assisted Setup button
-        assisted_setup_button_rect = pygame.Rect(button_x, y_pos, button_width, button_height)
-        assisted_setup_button = UIWidgets.draw_button(
+        check_updates_button_rect = pygame.Rect(right_x, y_pos, button_width, button_height)
+        check_updates_button = UIWidgets.draw_button(
             self.screen,
-            assisted_setup_button_rect,
-            "Assisted Setup",
+            check_updates_button_rect,
+            "Check for Updates",
             self.font_small,
             is_primary=False
         )
-        
-        result['assisted_setup_button'] = assisted_setup_button
+        result['check_updates_button'] = check_updates_button
         
         y_pos += 60
         
-        # Load Test Position button (alleen voor chess)
-        if hasattr(self.gui, 'engine') and hasattr(self.gui.engine, 'board'):
-            test_position_button_rect = pygame.Rect(button_x, y_pos, button_width, button_height)
-            test_position_button = UIWidgets.draw_button(
-                self.screen,
-                test_position_button_rect,
-                "Load Test Position",
-                self.font_small,
-                is_primary=False
-            )
-            
-            result['test_position_button'] = test_position_button_rect
-            y_pos += 60
+        # Close Debug button
+        close_dev_button_rect = pygame.Rect(left_x + (total_width - 250) // 2, y_pos, 250, button_height)
+        close_dev_button = UIWidgets.draw_button(
+            self.screen,
+            close_dev_button_rect,
+            "Close Debug",
+            self.font_small,
+            is_primary=False
+        )
+        result['close_dev_button'] = close_dev_button
         
-        # Info text
-        info_lines = [
-            "When enabled, yellow circles with 'M'",
-            "(Magnet) appear in the center of squares",
-            "where sensors detect a chess piece."
-        ]
-        for line in info_lines:
-            info_text = self.font_small.render(line, True, (100, 100, 100))
-            self.screen.blit(info_text, (dialog_x + 50, y_pos))
-            y_pos += 22
+        y_pos += 60

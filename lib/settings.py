@@ -65,7 +65,7 @@ class Settings:
         },
         'debug': {
             'debug_sensors': False,
-            'validate_board_state': False,
+            'validate_board_state': True,
         },
         'chess': {
             'play_vs_computer': False,
