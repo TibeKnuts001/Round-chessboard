@@ -725,9 +725,11 @@ class BaseGame(ABC):
                 # Check game status
                 if self.engine.is_game_over():
                     print(f"\n*** {self.engine.get_game_result()} ***\n")
-                    # Play checkmate sound
+                    # Play checkmate sound (chess) or checkers win sound
                     if hasattr(self.engine, 'is_checkmate') and self.engine.is_checkmate():
                         self.sound_manager.play_checkmate()
+                    elif 'wins' in self.engine.get_game_result().lower():
+                        self.sound_manager.play_checkers_win()
                 else:
                     # Check for check
                     if hasattr(self.engine, 'is_in_check') and self.engine.is_in_check():

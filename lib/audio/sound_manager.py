@@ -49,6 +49,7 @@ class SoundManager:
             'checkmate': 'assets/audio/checkmate.mp3',
             'mismatch': 'assets/audio/mismatch.mp3',
             'capture': 'assets/audio/capture.mp3',
+            'checkers_win': 'assets/audio/checkers_win.mp3',
         }
         
         for name, path in sound_files.items():
@@ -111,6 +112,17 @@ class SoundManager:
                 self.sounds['capture'].play()
             except Exception as e:
                 print(f"✗ Kon capture sound niet afspelen: {e}")
+    
+    def play_checkers_win(self):
+        """Speel checkers win sound effect"""
+        if not self._is_enabled():
+            return
+        
+        if 'checkers_win' in self.sounds:
+            try:
+                self.sounds['checkers_win'].play()
+            except Exception as e:
+                print(f"✗ Kon checkers_win sound niet afspelen: {e}")
     
     def set_volume(self, volume):
         """

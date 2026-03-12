@@ -175,6 +175,13 @@ class CheckersGame(BaseGame):
                 pieces_after = self.count_pieces()
                 if pieces_after < pieces_before:
                     self.sound_manager.play_capture()
+                
+                # Check game over after computer move
+                if self.engine.is_game_over():
+                    result = self.engine.get_game_result()
+                    print(f"\n*** {result} ***\n")
+                    if 'wins' in result.lower():
+                        self.sound_manager.play_checkers_win()
             except Exception as e:
                 print(f"Fout bij AI zet: {e}")
         else:
