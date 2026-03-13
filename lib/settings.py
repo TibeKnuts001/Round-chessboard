@@ -83,6 +83,7 @@ class Settings:
             'hide_board_display': False,  # Verberg bord op scherm (geen stukken, geen highlights)
             'cake_difficulty': 5,  # 1-10 (1=zwakst, 10=sterkst)
             'cake_think_time': 1000,  # Denktijd in ms (500-5000)
+            'checkers_variant': 'international8',  # '8x8 variant: international8, american, russian
         }
     }
     
@@ -109,6 +110,7 @@ class Settings:
         # Checkers
         'ai_difficulty': 'checkers',
         'ai_think_time': 'checkers',
+        'checkers_variant': 'checkers',
     }
     
     @staticmethod

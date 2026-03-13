@@ -7,18 +7,60 @@ Checkers-specifieke tabs voor settings dialog:
 - AI tab: Cake configuratie (difficulty, think time)
 """
 
+import pygame
 from lib.gui.widgets import UIWidgets
+
+CHECKERS_VARIANT_ITEMS = [
+    ('international8', 'International 8x8'),
+    ('american',       'American / English'),
+    ('russian',        'Russian'),
+]
 
 
 class CheckersSettingsTabs:
     """Checkers-specifieke settings tab renderers"""
-    
+
     @staticmethod
-    def render_gameplay_tab(screen, font_small, dialog_x, content_y, settings, result):
+    def render_gameplay_tab(screen, font_small, dialog_x, content_y, settings, result, gui=None):
         """Render gameplay tab voor checkers"""
         y_pos = content_y
         toggle_x = dialog_x + 50
-        
+
+        # --- Variant dropdown ---
+        variant_label = font_small.render("Variant", True, UIWidgets.COLOR_BLACK)
+        screen.blit(variant_label, (toggle_x, y_pos + 10))
+
+        current_variant = settings.get('checkers', {}).get('checkers_variant', 'international8')
+        variant_display = {v: n for v, n in CHECKERS_VARIANT_ITEMS}.get(current_variant, current_variant)
+        is_variant_open = bool(gui and getattr(gui, 'show_checkers_variant_dropdown', False))
+
+        variant_dropdown_rect = UIWidgets.draw_dropdown(
+            screen,
+            dialog_x + 150,
+            y_pos,
+            250,
+            38,
+            variant_display,
+            is_variant_open,
+            font_small
+        )
+        result['dropdowns']['checkers_variant'] = variant_dropdown_rect
+
+        if is_variant_open:
+            dropdown_items = UIWidgets.draw_dropdown_items(
+                screen,
+                dialog_x + 150,
+                y_pos + 38,
+                250,
+                36,
+                CHECKERS_VARIANT_ITEMS,
+                current_variant,
+                font_small
+            )
+            result['dropdown_items'] = dropdown_items
+
+        y_pos += 55
+
         # Play vs Computer toggle
         vs_computer_toggle = UIWidgets.draw_toggle(
             screen,
@@ -33,7 +75,7 @@ class CheckersSettingsTabs:
         
         result['toggles']['vs_computer_checkers'] = vs_computer_toggle
         
-        y_pos += 80
+        y_pos += 70
         
         # Strict touch-move toggle
         touch_move_toggle = UIWidgets.draw_toggle(
@@ -50,11 +92,11 @@ class CheckersSettingsTabs:
         result['toggles']['strict_touch_move_checkers'] = touch_move_toggle
         
         # Info text
-        y_pos += 60
+        y_pos += 55
         info_text = font_small.render("Strict = must move touched piece", True, (100, 100, 100))
         screen.blit(info_text, (dialog_x + 50, y_pos))
         
-        y_pos += 60
+        y_pos += 50
         
         # Hide Board Display toggle
         hide_board_toggle = UIWidgets.draw_toggle(

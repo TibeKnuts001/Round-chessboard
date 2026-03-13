@@ -1788,6 +1788,16 @@ class BaseGame(ABC):
         if self.gui.events.handle_power_profile_dropdown_click(
             pos, gui_result.get('dropdowns', {}).get('power_profile')):
             return
+
+        # Checkers variant dropdown
+        if getattr(self.gui, 'show_checkers_variant_dropdown', False) and \
+                self.gui.events.handle_checkers_variant_item_click(
+                    pos, gui_result.get('dropdown_items', [])):
+            return
+        if hasattr(self.gui.events, 'handle_checkers_variant_dropdown_click') and \
+                self.gui.events.handle_checkers_variant_dropdown_click(
+                    pos, gui_result.get('dropdowns', {}).get('checkers_variant')):
+            return
         
         # Slider clicks
         if self.gui.events.handle_brightness_slider_click(pos, sliders.get('brightness')):

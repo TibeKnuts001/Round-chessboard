@@ -132,6 +132,7 @@ class CheckersGUI:
         self.show_skip_setup_step_confirm = False  # Voor skip setup step confirmation
         self.show_undo_confirm = False  # Voor undo confirmation
         self.show_power_dropdown = False
+        self.show_checkers_variant_dropdown = False
         self.show_update_status_dialog = False  # Voor update status dialog
         self.show_color_selection = False  # Voor kleur/kant selectie voor nieuw spel
         self.color_selection_white_on_left = True  # True = wit links, False = zwart links
@@ -345,7 +346,7 @@ class CheckersGUI:
         # Checkers-specifieke renderers (wrapper lambdas om screen + font_small door te geven)
         custom_renderers = {
             'gameplay_checkers': lambda dx, cy, s, r: CheckersSettingsTabs.render_gameplay_tab(
-                self.screen, self.font_small, dx, cy, s, r
+                self.screen, self.font_small, dx, cy, s, r, gui=self
             ),
             'ai_checkers': lambda dx, cy, s, r: CheckersSettingsTabs.render_ai_tab(
                 self.screen, self.font_small, dx, cy, s, r

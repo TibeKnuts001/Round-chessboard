@@ -20,8 +20,24 @@ Notatie:
 - Chess notatie mapping: A1-H8 -> 1-32 numbering
 """
 
-from draughts import International8Board
+from draughts import International8Board, AmericanBoard, RussianBoard
 from lib.core.base_engine import BaseEngine
+
+# 8x8-compatibele varianten
+CHECKERS_VARIANTS = {
+    'international8': International8Board,
+    'american': AmericanBoard,
+    'russian': RussianBoard,
+}
+
+def _load_variant_setting():
+    """Lees checkers_variant uit settings file"""
+    try:
+        from lib.settings import Settings
+        s = Settings()
+        return s.get('checkers_variant', 'international8', section='checkers')
+    except Exception:
+        return 'international8'
 
 
 class CheckersEngine(BaseEngine):
@@ -52,16 +68,18 @@ class CheckersEngine(BaseEngine):
     
     def __init__(self):
         """Initialiseer nieuw damspel in startpositie"""
-        # Amerikaanse dammen (8x8, ook bekend als "English draughts")
-        # International8Board: 8x8, flying kings, men forward-only, mandatory captures
-        self.board = International8Board()
+        self.variant = _load_variant_setting()
+        board_cls = CHECKERS_VARIANTS.get(self.variant, International8Board)
+        self.board = board_cls()
         self.selected_square = None
         self.move_count = 0  # Track aantal halve zetten
         self.move_history = []  # Track moves for undo display
     
     def reset(self):
-        """Reset bord naar startpositie"""
-        self.board = International8Board()
+        """Reset bord naar startpositie (leest variant opnieuw uit settings)"""
+        self.variant = _load_variant_setting()
+        board_cls = CHECKERS_VARIANTS.get(self.variant, International8Board)
+        self.board = board_cls()
         self.selected_square = None
         self.move_count = 0
         self.move_history = []

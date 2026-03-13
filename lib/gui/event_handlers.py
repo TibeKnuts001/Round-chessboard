@@ -546,6 +546,29 @@ class EventHandlers:
     
     # Exit confirmation handlers
     
+    def handle_checkers_variant_dropdown_click(self, pos, dropdown_rect):
+        """Handle click on checkers variant dropdown button - toggle open/close"""
+        if dropdown_rect and dropdown_rect.collidepoint(pos):
+            self.gui.show_checkers_variant_dropdown = not self.gui.show_checkers_variant_dropdown
+            return True
+        return False
+
+    def handle_checkers_variant_item_click(self, pos, dropdown_items):
+        """Handle click on checkers variant dropdown item"""
+        if not dropdown_items:
+            return False
+        for item in dropdown_items:
+            value, rect, text, is_selected = item
+            if rect.collidepoint(pos):
+                if not self.gui.temp_settings:
+                    self.gui.temp_settings = self.gui.settings.get_temp_copy()
+                Settings.set_in_dict(self.gui.temp_settings, 'checkers_variant', value, section='checkers')
+                self.gui.show_checkers_variant_dropdown = False
+                return True
+        return False
+
+    # Exit confirmation handlers
+    
     def handle_exit_click(self, pos):
         """Handle klik op exit button"""
         if self.gui.exit_button.collidepoint(pos):
