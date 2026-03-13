@@ -634,7 +634,9 @@ class DialogRenderer:
             'checking': 'Checking Updates...',
             'up_to_date': 'Up to Date',
             'available': 'Update Available',
+            'waiting':   'Update in progress',
             'success': 'Update Successful!',
+            'restarting': 'Update Successful!',
             'error': 'Update Failed'
         }.get(status, 'Update Status')
         
@@ -657,44 +659,49 @@ class DialogRenderer:
             y_pos += 25
         
         # Buttons based on status
-        if status == 'available':
+        if status == 'waiting':
+            # Geen knoppen, enkel grote "Please wait" tekst
+            font_wait = pygame.font.Font(None, 52)
+            wait_text = font_wait.render("Please wait...", True, (50, 50, 50))
+            wait_rect = wait_text.get_rect(
+                center=(self.screen_width // 2, dialog_y + dialog_height - 55)
+            )
+            self.screen.blit(wait_text, wait_rect)
+            return {'update_button': None, 'cancel_button': None}
+
+        elif status == 'available':
             # Two buttons: Update and Cancel
             button_y = dialog_y + dialog_height - 70
-            
-            # Update button (left)
-            update_button = pygame.Rect(
-                self.screen_width // 2 - 140,
-                button_y,
-                120,
-                50
-            )
-            
-            # Cancel button (right)
-            cancel_button = pygame.Rect(
-                self.screen_width // 2 + 20,
-                button_y,
-                120,
-                50
-            )
-            
+
+            update_button = pygame.Rect(self.screen_width // 2 - 140, button_y, 120, 50)
+            cancel_button = pygame.Rect(self.screen_width // 2 + 20,  button_y, 120, 50)
+
             mouse_pos = pygame.mouse.get_pos()
-            
-            # Draw Update button
+
             update_color = self.COLOR_BUTTON_HOVER if update_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
             pygame.draw.rect(self.screen, update_color, update_button, border_radius=10)
             update_text = self.font.render("Update", True, self.COLOR_WHITE)
-            update_text_rect = update_text.get_rect(center=update_button.center)
-            self.screen.blit(update_text, update_text_rect)
-            
-            # Draw Cancel button
+            self.screen.blit(update_text, update_text.get_rect(center=update_button.center))
+
             cancel_color = (150, 150, 150) if cancel_button.collidepoint(mouse_pos) else (120, 120, 120)
             pygame.draw.rect(self.screen, cancel_color, cancel_button, border_radius=10)
             cancel_text = self.font.render("Cancel", True, self.COLOR_WHITE)
-            cancel_text_rect = cancel_text.get_rect(center=cancel_button.center)
-            self.screen.blit(cancel_text, cancel_text_rect)
-            
+            self.screen.blit(cancel_text, cancel_text.get_rect(center=cancel_button.center))
+
             return {'update_button': update_button, 'cancel_button': cancel_button}
         
+        elif status == 'restarting':
+            # Groot aftelnummer, geen knoppen
+            countdown = update_info.get('countdown', 5)
+            font_countdown = pygame.font.Font(None, 120)
+            num_text = font_countdown.render(str(countdown), True, (50, 130, 50))
+            num_rect = num_text.get_rect(center=(self.screen_width // 2, dialog_y + dialog_height - 55))
+            self.screen.blit(num_text, num_rect)
+            label = self.font_small.render("Restarting...", True, (80, 80, 80))
+            label_rect = label.get_rect(center=(self.screen_width // 2, dialog_y + dialog_height - 100))
+            self.screen.blit(label, label_rect)
+            return None
+
         elif status in ['up_to_date', 'success', 'error']:
             # Single OK button
             ok_button = pygame.Rect(
@@ -703,15 +710,15 @@ class DialogRenderer:
                 130,
                 50
             )
-            
+
             mouse_pos = pygame.mouse.get_pos()
             button_color = self.COLOR_BUTTON_HOVER if ok_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
             pygame.draw.rect(self.screen, button_color, ok_button, border_radius=10)
-            
+
             ok_text = self.font.render("OK", True, self.COLOR_WHITE)
             ok_text_rect = ok_text.get_rect(center=ok_button.center)
             self.screen.blit(ok_text, ok_text_rect)
-            
+
             return {'ok_button': ok_button}
-        
+
         return None

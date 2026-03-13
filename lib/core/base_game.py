@@ -1695,6 +1695,10 @@ class BaseGame(ABC):
                 update_button = update_dialog_buttons.get('update_button')
                 if update_button and update_button.collidepoint(pos):
                     print("Starting update...")
+                    # Toon "Please wait" met uitgeschakelde knoppen voor de update begint
+                    self.gui.update_info = {'status': 'waiting', 'message': ''}
+                    self.gui.dialog_renderer.draw_update_status_dialog(self.gui.update_info)
+                    pygame.display.flip()
                     self._perform_update()
                 
                 # Cancel button (for available)
@@ -2760,6 +2764,7 @@ class BaseGame(ABC):
         """Perform actual update"""
         import subprocess
         import os
+        import sys
         
         # Show updating status
         self.gui.update_info = {
@@ -2792,18 +2797,29 @@ class BaseGame(ABC):
             
             # Check if successful
             if result.returncode == 0 and 'Update completed successfully' in output:
-                self.gui.update_info = {
-                    'status': 'success',
-                    'message': 'Update completed successfully!',
-                    'details': [
-                        'New version installed',
-                        '',
-                        'Please restart the application'
-                    ]
-                }
                 # Reset update notification
                 self.update_available = False
                 self.update_version_info = ""
+                # Aftellen van 5 naar 1 en herstarten
+                for countdown in range(5, 0, -1):
+                    self.gui.update_info = {
+                        'status': 'restarting',
+                        'message': 'Update completed successfully!',
+                        'details': ['New version installed'],
+                        'countdown': countdown,
+                    }
+                    self.screen.fill(self.gui.COLOR_BG)
+                    self.gui.draw_board()
+                    self.gui.draw_sidebar()
+                    self.gui.dialog_renderer.draw_update_status_dialog(self.gui.update_info)
+                    pygame.display.flip()
+                    time.sleep(1)
+                # Herstart het huidige spel
+                self.leds.cleanup()
+                pygame.quit()
+                import subprocess
+                subprocess.Popen([sys.executable] + sys.argv)
+                os._exit(0)
             else:
                 # Error
                 error_lines = [line.strip() for line in output.split('\n') if line.strip() and not line.startswith('#')][-3:]
