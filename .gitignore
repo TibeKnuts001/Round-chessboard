@@ -14,6 +14,8 @@ build/
 # IDE
 .vscode/
 .idea/
+.copilot_summary
+.copilot_summary.txt
 *.swp
 *.swo
 *~
