@@ -203,5 +203,17 @@ class LEDController:
         return self.led_count
     
     def cleanup(self):
-        """Cleanup: zet alle LEDs uit"""
-        self.clear()
+        """Cleanup: zet alle LEDs uit en geef GPIO/DMA hardware vrij"""
+        try:
+            self.clear()
+        except Exception:
+            pass
+        # Verwijder strip object zodat de C destructor draait:
+        # - rpi_ws281x: roept ws2811_fini() aan → stopt DMA kanaal
+        # - Pi5/adafruit: geeft lgpio/GPIO pin vrij
+        if getattr(self, 'strip', None) is not None:
+            try:
+                del self.strip
+            except Exception:
+                pass
+            self.strip = None

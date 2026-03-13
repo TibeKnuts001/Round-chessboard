@@ -393,9 +393,11 @@ class CheckersGUI:
         result = {}
         
         if self.show_exit_confirm:
-            exit_yes_button, exit_no_button = self.dialog_renderer.draw_exit_confirm_dialog()
+            show_yes = self.settings.get('allow_force_quit', False, section='debug')
+            exit_yes_button, exit_no_button, exit_switch_button = self.dialog_renderer.draw_exit_confirm_dialog(other_game='Chess', show_yes=show_yes)
             result['exit_yes'] = exit_yes_button
             result['exit_no'] = exit_no_button
+            result['exit_switch'] = exit_switch_button
         elif self.show_stop_game_confirm:
             stop_game_yes_button, stop_game_no_button = self.dialog_renderer.draw_stop_game_confirm_dialog()
             result['stop_game_yes'] = stop_game_yes_button

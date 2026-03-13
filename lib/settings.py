@@ -66,6 +66,7 @@ class Settings:
         'debug': {
             'debug_sensors': False,
             'validate_board_state': True,
+            'allow_force_quit': False,  # Toon 'Yes' (forceer afsluiten) knop in exit popup
         },
         'chess': {
             'play_vs_computer': False,
@@ -99,6 +100,7 @@ class Settings:
         # Debug
         'debug_sensors': 'debug',
         'validate_board_state': 'debug',
+        'allow_force_quit': 'debug',
         # Chess
         'play_vs_computer': 'chess',
         'strict_touch_move': 'chess',

@@ -367,9 +367,21 @@ class SettingsDialog:
         
         result['toggles']['validate_board_state'] = validate_toggle_rect
         
-        y_pos += 65
-        
-        # Start Screensaver + Check for Updates side by side
+        y_pos += 55
+
+        # Allow Force Quit toggle
+        force_quit_toggle_rect = UIWidgets.draw_toggle(
+            self.screen,
+            toggle_x,
+            y_pos,
+            settings.get('debug', {}).get('allow_force_quit', False),
+            self.font_small
+        )
+        label = self.font_small.render("Show Force-Quit in exit popup", True, UIWidgets.COLOR_BLACK)
+        self.screen.blit(label, (force_quit_toggle_rect.right + 15, y_pos + 8))
+        result['toggles']['allow_force_quit'] = force_quit_toggle_rect
+
+        y_pos += 55
         button_width = 185
         button_height = 45
         button_spacing = 20

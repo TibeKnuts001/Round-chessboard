@@ -63,67 +63,91 @@ class DialogRenderer:
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
         self.screen.blit(overlay, (0, 0))
-    def draw_exit_confirm_dialog(self):
+    def draw_exit_confirm_dialog(self, other_game=None, show_yes=False):
         """
         Teken exit confirmation dialog
-        
+
+        Args:
+            other_game: Optional display name van het andere spel (bijv. "Chess" of "Checkers").
+            show_yes: Toon de rode 'Yes' (forceer afsluiten) knop (alleen in debug).
+
         Returns:
-            Tuple: (yes_button, no_button)
+            Tuple: (yes_button, no_button, switch_button)
+            yes_button is None als show_yes=False.
+            switch_button is None als other_game=None.
         """
         self._draw_overlay()
-        
-        # Dialog box
-        dialog_width = 400
-        dialog_height = 200
+
+        has_switch = other_game is not None
+        # Breedte: bigger als Yes èn Switch allebei aanwezig
+        if show_yes and has_switch:
+            dialog_width = 460
+        else:
+            dialog_width = 400
+        dialog_height = 240 if (has_switch or show_yes) else 200
         dialog_x = (self.screen_width - dialog_width) // 2
         dialog_y = (self.screen_height - dialog_height) // 2
-        
+
         dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height)
         pygame.draw.rect(self.screen, self.COLOR_WHITE, dialog_rect, border_radius=15)
-        
+
         # Title
         title = self.font.render("Exit Game?", True, self.COLOR_BLACK)
-        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 50))
+        title_rect = title.get_rect(center=(self.screen_width // 2, dialog_y + 45))
         self.screen.blit(title, title_rect)
-        
+
         # Message
         message = self.font_small.render("Are you sure you want to quit?", True, (100, 100, 100))
-        message_rect = message.get_rect(center=(self.screen_width // 2, dialog_y + 90))
+        message_rect = message.get_rect(center=(self.screen_width // 2, dialog_y + 85))
         self.screen.blit(message, message_rect)
-        
-        # Yes button (red)
-        yes_button = pygame.Rect(
-            self.screen_width // 2 - 160,
-            dialog_y + dialog_height - 70,
-            130,
-            50
-        )
-        
-        # No button (blue)
-        no_button = pygame.Rect(
-            self.screen_width // 2 + 30,
-            dialog_y + dialog_height - 70,
-            130,
-            50
-        )
-        
+
         mouse_pos = pygame.mouse.get_pos()
-        
-        # Yes button
-        yes_color = (220, 70, 70) if yes_button.collidepoint(mouse_pos) else (200, 50, 50)
-        pygame.draw.rect(self.screen, yes_color, yes_button, border_radius=10)
-        yes_text = self.font.render("Yes", True, self.COLOR_WHITE)
-        yes_text_rect = yes_text.get_rect(center=yes_button.center)
-        self.screen.blit(yes_text, yes_text_rect)
-        
-        # No button
-        no_color = self.COLOR_BUTTON_HOVER if no_button.collidepoint(mouse_pos) else self.COLOR_BUTTON
-        pygame.draw.rect(self.screen, no_color, no_button, border_radius=10)
-        no_text = self.font.render("No", True, self.COLOR_WHITE)
-        no_text_rect = no_text.get_rect(center=no_button.center)
-        self.screen.blit(no_text, no_text_rect)
-        
-        return yes_button, no_button
+        btn_y = dialog_y + dialog_height - 70
+        btn_h = 50
+        btn_w = 130
+        gap = 15
+
+        # Bepaal welke knoppen er zijn
+        buttons = []
+        if show_yes:
+            buttons.append('yes')
+        if has_switch:
+            buttons.append('switch')
+        buttons.append('no')
+
+        total_w = len(buttons) * btn_w + (len(buttons) - 1) * gap
+        start_x = self.screen_width // 2 - total_w // 2
+
+        yes_button = None
+        switch_button = None
+        no_button = None
+
+        for i, btn_type in enumerate(buttons):
+            bx = start_x + i * (btn_w + gap)
+            rect = pygame.Rect(bx, btn_y, btn_w, btn_h)
+
+            if btn_type == 'yes':
+                yes_button = rect
+                color = (220, 70, 70) if rect.collidepoint(mouse_pos) else (200, 50, 50)
+                pygame.draw.rect(self.screen, color, rect, border_radius=10)
+                txt = self.font.render("Yes", True, self.COLOR_WHITE)
+                self.screen.blit(txt, txt.get_rect(center=rect.center))
+
+            elif btn_type == 'switch':
+                switch_button = rect
+                color = (80, 180, 80) if rect.collidepoint(mouse_pos) else (60, 160, 60)
+                pygame.draw.rect(self.screen, color, rect, border_radius=10)
+                txt = self.font_small.render(other_game, True, self.COLOR_WHITE)
+                self.screen.blit(txt, txt.get_rect(center=rect.center))
+
+            elif btn_type == 'no':
+                no_button = rect
+                color = self.COLOR_BUTTON_HOVER if rect.collidepoint(mouse_pos) else self.COLOR_BUTTON
+                pygame.draw.rect(self.screen, color, rect, border_radius=10)
+                txt = self.font.render("No", True, self.COLOR_WHITE)
+                self.screen.blit(txt, txt.get_rect(center=rect.center))
+
+        return yes_button, no_button, switch_button
     
     def draw_new_game_confirm_dialog(self):
         """

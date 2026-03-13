@@ -757,6 +757,41 @@ class BaseGame(ABC):
         self.temp_message = message
         self.temp_message_timer = pygame.time.get_ticks() + duration
     
+    def _any_modal_open(self):
+        """Geeft True terug als er een popup, dialoog of settings scherm open is."""
+        return (
+            self.gui.show_settings
+            or self.gui.show_exit_confirm
+            or self.gui.show_new_game_confirm
+            or self.gui.show_stop_game_confirm
+            or self.gui.show_undo_confirm
+            or self.gui.show_update_status_dialog
+            or self.gui.show_skip_setup_step_confirm
+            or (hasattr(self.gui, 'show_promotion_dialog') and self.gui.show_promotion_dialog)
+            or (hasattr(self.gui, 'show_color_selection') and self.gui.show_color_selection)
+        )
+
+    def _switch_to_other_game(self):
+        """Sluit huidig spel af en start het andere spel (chess↔checkers)."""
+        import sys
+        import os
+        import time
+        import subprocess
+        # Bepaal welk script het andere spel is
+        current = os.path.basename(sys.argv[0])
+        if 'checkers' in current.lower():
+            other_script = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'chessgame.py')
+        else:
+            other_script = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), 'checkersgame.py')
+        print(f"\nSwitching to {os.path.basename(other_script)}...")
+        # Geef LED hardware vrij VOOR de nieuwe game start:
+        # os.execv zou ws2811_fini()/GPIO cleanup overslaan waardoor DMA bezet blijft
+        self.leds.cleanup()
+        pygame.quit()
+        time.sleep(0.5)  # Wacht tot hardware volledig vrijgegeven is
+        subprocess.Popen([sys.executable, other_script])
+        os._exit(0)  # Hard exit: geen dubbele cleanup via __del__
+
     def run(self):
         """
         Main game loop (shared tussen alle games)
@@ -1345,6 +1380,7 @@ class BaseGame(ABC):
         toggles = gui_result.get('toggles', {})
         exit_yes_button = gui_result.get('exit_yes')
         exit_no_button = gui_result.get('exit_no')
+        exit_switch_button = gui_result.get('exit_switch')
         new_game_normal_button = gui_result.get('new_game_normal')
         new_game_assisted_button = gui_result.get('new_game_assisted')
         new_game_cancel_button = gui_result.get('new_game_cancel')
@@ -1398,6 +1434,7 @@ class BaseGame(ABC):
         toggles = gui_result.get('toggles', {})
         exit_yes_button = gui_result.get('exit_yes')
         exit_no_button = gui_result.get('exit_no')
+        exit_switch_button = gui_result.get('exit_switch')
         new_game_normal_button = gui_result.get('new_game_normal')
         new_game_assisted_button = gui_result.get('new_game_assisted')
         new_game_cancel_button = gui_result.get('new_game_cancel')
@@ -1410,8 +1447,8 @@ class BaseGame(ABC):
         undo_no_button = gui_result.get('undo_no')
         update_notification_rect = gui_result.get('update_notification_rect')
         
-        # Update notification click (open update dialog)
-        if update_notification_rect and update_notification_rect.collidepoint(pos):
+        # Update notification click (open update dialog) — niet als een modal open is
+        if update_notification_rect and update_notification_rect.collidepoint(pos) and not self._any_modal_open():
             print("Update notification clicked - showing update dialog")
             self._check_for_updates()
             return True
@@ -1524,6 +1561,9 @@ class BaseGame(ABC):
         elif self.gui.show_exit_confirm:
             if self.gui.handle_exit_yes_click(pos, exit_yes_button):
                 print("\nExiting game...")
+                return False
+            elif exit_switch_button and exit_switch_button.collidepoint(pos):
+                self._switch_to_other_game()
                 return False
             elif self.gui.handle_exit_no_click(pos, exit_no_button):
                 pass
@@ -1756,6 +1796,8 @@ class BaseGame(ABC):
         if self.gui.events.handle_use_worstfish_toggle_click(pos, toggles.get('use_worstfish')):
             return
         if self.gui.events.handle_validate_board_state_toggle_click(pos, toggles.get('validate_board_state')):
+            return
+        if self.gui.events.handle_allow_force_quit_toggle_click(pos, toggles.get('allow_force_quit')):
             return
         if self.gui.events.handle_screensaver_audio_toggle_click(pos, toggles.get('screensaver_audio')):
             return

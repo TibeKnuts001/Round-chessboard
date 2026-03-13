@@ -334,7 +334,8 @@ class ChessGUI:
     
     def draw_exit_confirm_dialog(self):
         """Teken exit confirmation dialog"""
-        return self.dialog_renderer.draw_exit_confirm_dialog()
+        show_yes = self.settings.get('allow_force_quit', False, section='debug')
+        return self.dialog_renderer.draw_exit_confirm_dialog(other_game='Checkers', show_yes=show_yes)
     
     def draw_new_game_confirm_dialog(self):
         """Teken new game confirmation dialog"""
@@ -583,8 +584,9 @@ class ChessGUI:
         # Teken exit confirmation dialog indien nodig
         exit_yes_button = None
         exit_no_button = None
+        exit_switch_button = None
         if self.show_exit_confirm:
-            exit_yes_button, exit_no_button = self.draw_exit_confirm_dialog()
+            exit_yes_button, exit_no_button, exit_switch_button = self.draw_exit_confirm_dialog()
         
         # Teken stop game confirmation dialog indien nodig
         stop_game_yes_button = None
@@ -674,6 +676,7 @@ class ChessGUI:
             'undo_button': self.undo_button,
             'exit_yes': exit_yes_button,
             'exit_no': exit_no_button,
+            'exit_switch': exit_switch_button,
             'stop_game_yes': stop_game_yes_button,
             'stop_game_no': stop_game_no_button,
             'new_game_normal': new_game_normal_button,

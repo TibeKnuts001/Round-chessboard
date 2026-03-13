@@ -176,7 +176,17 @@ class EventHandlers:
             Settings.set_in_dict(self.gui.temp_settings, 'validate_board_state', not current_value)
             return True
         return False
-    
+
+    def handle_allow_force_quit_toggle_click(self, pos, toggle_rect):
+        """Handle klik op allow_force_quit toggle (debug)"""
+        if toggle_rect and toggle_rect.collidepoint(pos):
+            if not self.gui.temp_settings:
+                self.gui.temp_settings = self.gui.settings.get_temp_copy()
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'allow_force_quit', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'allow_force_quit', not current_value)
+            return True
+        return False
+
     def handle_screensaver_audio_toggle_click(self, pos, toggle_rect):
         """Handle klik op screensaver audio toggle switch"""
         if toggle_rect and toggle_rect.collidepoint(pos):
@@ -187,7 +197,7 @@ class EventHandlers:
             Settings.set_in_dict(self.gui.temp_settings, 'screensaver_audio', not current_value, section='general')
             return True
         return False
-    
+
     # Checkers-specific toggle handlers
     
     def handle_vs_computer_checkers_toggle_click(self, pos, toggle_rect):
@@ -337,6 +347,16 @@ class EventHandlers:
             return True
         return False
     
+    def handle_allow_force_quit_toggle_click(self, pos, toggle_rect):
+        """Handle klik op allow_force_quit toggle (debug)"""
+        if toggle_rect is None:
+            return False
+        if toggle_rect.collidepoint(pos):
+            current_value = Settings.get_from_dict(self.gui.temp_settings, 'allow_force_quit', False)
+            Settings.set_in_dict(self.gui.temp_settings, 'allow_force_quit', not current_value)
+            return True
+        return False
+
     def handle_validate_board_state_toggle_click(self, pos, toggle_rect):
         """Handle klik op validate board state toggle switch"""
         if toggle_rect is None:
