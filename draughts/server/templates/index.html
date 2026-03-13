@@ -1,0 +1,108 @@
+{% extends "base.html" %} 
+
+{% block content %}
+<div class="app-container">
+  <main class="main-content">
+    
+    <!-- Left Panel - Controls -->
+    <div class="side-panel panel">
+      <div class="panel-header">Controls</div>
+      <div class="panel-body">
+        
+        <!-- Board Type - Compact -->
+        <div class="btn-group-vertical w-100 mb-3">
+          <a href="/set_board/american" class="btn btn-game btn-sm">8×8 American</a>
+          <a href="/set_board/russian" class="btn btn-game btn-sm">8×8 Russian</a>
+          <a href="/set_board/standard" class="btn btn-game btn-sm">10×10 Standard</a>
+          <a href="/set_board/frisian" class="btn btn-game btn-sm">10×10 Frisian</a>
+        </div>
+
+        <!-- Engine Depth -->
+        <div class="depth-control mb-3">
+          <span class="small text-muted">Depth</span>
+          <span id="depthValue" class="depth-badge">6</span>
+          <input type="range" class="form-range" id="depthSlider" min="1" max="10" value="6">
+        </div>
+
+        <!-- Engine Match Info -->
+        <div id="engineMatchInfo" class="engine-match-compact mb-3" style="display: none;">
+          <span id="whiteEngineName" class="engine-tag white">-</span>
+          <span class="vs">vs</span>
+          <span id="blackEngineName" class="engine-tag black">-</span>
+        </div>
+
+        <!-- Primary Actions -->
+        <div class="d-grid gap-1 mb-3">
+          <button id="makeMove" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-cpu"></i> Engine Move
+          </button>
+          <button id="autoPlay" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-play-fill"></i> Auto Play
+          </button>
+          <button id="popBtn" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-arrow-counterclockwise"></i> Undo
+          </button>
+        </div>
+
+        <!-- Import/Export -->
+        <div class="d-grid gap-1">
+          <button id="copyFen" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-clipboard"></i> Copy FEN
+          </button>
+          <button id="loadFen" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-file-earmark"></i> Load FEN
+          </button>
+          <button id="copyPdn" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-file-text"></i> Copy PDN
+          </button>
+          <button id="loadPdn" class="btn btn-game btn-sm" type="button">
+            <i class="bi bi-upload"></i> Load PDN
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Board Area -->
+    <div class="board-area">
+      <div 
+        id="board" 
+        class="game-board"
+        data-crown-icon="{{ url_for('static', path='img/crown-icon.svg') }}"
+      >
+        {% for i in range(size) %}
+        <div class="tile" id="tile-{{ i }}" data-tile-number="{{ i }}">
+          <span id="tile-{{ i }}-text" class="tile-text"></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Right Panel - Info -->
+    <div class="side-panel panel">
+      <div class="panel-header">
+        <div id="turnIndicator" class="turn-compact turn-white">
+          <span class="turn-dot"></span>
+          <span id="turn">White</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="moveList" class="move-list"></div>
+      </div>
+    </div>
+    
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="notificationToast" class="toast" role="alert">
+    <div class="toast-header">
+      <i class="bi bi-check-circle-fill text-success me-2" id="toastIcon"></i>
+      <strong class="me-auto" id="toastTitle">Done</strong>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body" id="toastMessage"></div>
+  </div>
+</div>
+{% endblock %}

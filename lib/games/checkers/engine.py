@@ -20,7 +20,7 @@ Notatie:
 - Chess notatie mapping: A1-H8 -> 1-32 numbering
 """
 
-from draughts import AmericanBoard
+from draughts import International8Board
 from lib.core.base_engine import BaseEngine
 
 
@@ -53,15 +53,15 @@ class CheckersEngine(BaseEngine):
     def __init__(self):
         """Initialiseer nieuw damspel in startpositie"""
         # Amerikaanse dammen (8x8, ook bekend als "English draughts")
-        # AmericanBoard is het 8x8 variant van py-draughts
-        self.board = AmericanBoard()
+        # International8Board: 8x8, flying kings, men forward-only, mandatory captures
+        self.board = International8Board()
         self.selected_square = None
         self.move_count = 0  # Track aantal halve zetten
         self.move_history = []  # Track moves for undo display
     
     def reset(self):
         """Reset bord naar startpositie"""
-        self.board = AmericanBoard()
+        self.board = International8Board()
         self.selected_square = None
         self.move_count = 0
         self.move_history = []
